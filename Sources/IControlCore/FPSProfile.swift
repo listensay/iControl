@@ -143,12 +143,13 @@ public struct FPSProfile: Codable, Equatable, Identifiable, Sendable {
     public var joystick = FPSPoint(x: 0.15, y: 0.76)
     public var joystickEnabled = true
     /// Time for one full axis offset, in seconds. Steering travels in a straight
-    /// line from the current position to the latest target, including releases.
+    /// line from the current position to the latest target. Releasing an axis
+    /// clears that axis immediately while the remaining travel completes.
     /// A full reversal takes twice this time; stopping lifts without animation.
     public var keyboardTurnDuration = 0.025
     public var cursorToggleKey = "Backquote"
-    /// Each axis' travel in fractions of display height; X is aspect adjusted.
-    /// Diagonals use both full offsets, rather than reducing either axis.
+    /// Circular travel radius in fractions of display height; X is aspect
+    /// adjusted. Straight and diagonal targets have the same distance to center.
     public var joystickRadius = 0.085
     public var look = FPSPoint(x: 0.66, y: 0.43)
     public var lookEnabled = true

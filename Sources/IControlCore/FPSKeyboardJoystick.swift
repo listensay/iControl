@@ -1,7 +1,8 @@
 import Foundation
 
-/// One touch steers the wheel for as long as a movement key is held. Horizontal
-/// and vertical travel add independently, as in QtScrcpy's KMT_STEER_WHEEL.
+/// One touch steers the wheel for as long as a movement key is held. All eight
+/// targets stay within the displayed circle so diagonals cannot shift a
+/// floating joystick's origin by exceeding its configured travel radius.
 /// The latest opposing key wins on each axis; key repeat does not change it.
 struct FPSKeyboardJoystick: Sendable {
     // A center down must survive one display frame before the initial drag.
@@ -25,8 +26,10 @@ struct FPSKeyboardJoystick: Sendable {
             // A new press after this up edge starts a fresh center down.
             self = Self(); return nil
         }
-        let next = FPSPoint(x: horizontal == "KeyD" ? 1 : horizontal == "KeyA" ? -1 : 0,
-                            y: vertical == "KeyS" ? 1 : vertical == "KeyW" ? -1 : 0)
+        let x = horizontal == "KeyD" ? 1.0 : horizontal == "KeyA" ? -1.0 : 0
+        let y = vertical == "KeyS" ? 1.0 : vertical == "KeyW" ? -1.0 : 0
+        let length = hypot(x, y)
+        let next = FPSPoint(x: x / length, y: y / length)
         if anchorTime == nil {
             anchorTime = now; target = next
             return current
@@ -41,6 +44,11 @@ struct FPSKeyboardJoystick: Sendable {
         } else {
             updateTravel(now: now)
             if next != target {
+                // A released axis must stop on the key edge. Continuing to
+                // interpolate its old offset makes W alone still steer sideways.
+                // Correct only that axis; keep the touch and remaining travel.
+                if next.x == 0 { current.x = 0 }
+                if next.y == 0 { current.y = 0 }
                 // Replace the old trajectory, starting at its current position.
                 // Never queue obsolete directions or lift on an axis release.
                 beginTravel(to: next, now: now, duration: turnDuration)

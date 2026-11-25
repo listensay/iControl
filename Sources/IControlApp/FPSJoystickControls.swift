@@ -12,7 +12,7 @@ struct FPSJoystickControls: View {
                 Text("\(Int((profile.keyboardTurnDuration * 1000).rounded())) ms").monospacedDigit()
             }
             Button("即时换向") { profile.keyboardTurnDuration = 0 }
-            Text("斜走保留横向与纵向的完整推杆距离；加键、松键连续过渡，全部松开停止。上方时间为单轴完整位移，完全反向需两倍时间；0 ms 即时响应。相反方向优先后按的键。移动中心需要对准游戏摇杆中心，推杆距离在画面中调整；建议使用游戏的固定摇杆模式。")
+            Text("直走与斜走保持相同推杆半径，触点始终在圆圈内。松开 A / D 后立即清除横向偏移，只按 W 就沿正前方推杆；移动触点保持按住。上方时间为一个半径的过渡，完全反向需两倍时间；0 ms 即时响应。移动中心需对准游戏静止时的摇杆中心，推杆距离不能超过游戏摇杆的活动范围；建议使用固定摇杆模式。")
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }.font(.system(size: 11))
     }

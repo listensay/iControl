@@ -149,7 +149,11 @@ export class FPSOverlay {
       if (this.editing) this.handles(zone);
       this.root.appendChild(zone); add('look', '鼠标转向', '转向区域', 'look');
     }
-    if (p.joystick) add('joystick', 'WASD', '移动摇杆', 'joystick');
+    if (p.joystick) {
+      const wheel = add('joystick', 'WASD', '移动摇杆', 'joystick');
+      const forward = document.createElement('span'); forward.className = 'fps-joystick-forward'; wheel.appendChild(forward);
+      const center = document.createElement('span'); center.className = 'fps-joystick-center'; wheel.appendChild(center);
+    }
     for (const binding of p.bindings || []) {
       add(binding.id, binding.label, binding.title || binding.id, '', binding.enabled === false);
       if (binding.endX !== undefined) {

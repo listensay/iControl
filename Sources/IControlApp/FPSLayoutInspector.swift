@@ -36,9 +36,11 @@ struct FPSLayoutInspector: View {
                     dimension("推杆距离", value: layoutValue(\.joystickRadius) {
                         controller.layoutGeometry(target: "joystick", radius: $0)
                     }, range: FPSProfile.joystickRadiusRange)
-                    Button("测试 WASD 换向", action: controller.testLayoutMovement)
-                        .disabled(!controller.ready || controller.layoutTesting)
-                    Text("测试会实际移动角色约 1.5 秒，请在安全位置测试。")
+                    HStack {
+                        Button("测试直行 W", action: controller.testLayoutForward)
+                        Button("测试八向", action: controller.testLayoutMovement)
+                    }.disabled(!controller.ready || controller.layoutTesting)
+                    Text("直行测试只发送 W 约 1 秒，八向测试约 1.5 秒。若直行仍偏，将中心十字对准游戏静止时的摇杆中心后再测。")
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 } else if editor.selection == "look" {
                     FPSMouseAxisControls(profile: draftBinding)

@@ -31,15 +31,18 @@ let fpsKeyboard = FPSKeyboardMovementTests()
 let fpsCursor = FPSCursorTests()
 let fpsLinks = FPSKeyLinkTests()
 let checks: [(String, () throws -> Void)] = [
+    ("WASD circular travel / no floating-origin displacement", fpsKeyboard.testDiagonalTrajectoriesStayInsideTheDisplayedJoystickCircle),
+    ("WASD forward after diagonal / immediate zero lateral offset / native retained touch", fpsKeyboard.testForwardAfterDiagonalReleaseHasNoLateralOffsetOnTheKeyEdge),
+    ("WASD forward preview / one vertical native touch / no mouse input / final release", fpsKeyboard.testForwardPreviewKeepsOneVerticalNativeTouchWithoutMouseInput),
     ("WASD center dwell / smooth initial travel / rapid edges", fpsKeyboard.testCenterDownSurvivesRapidEdgesAndInitialTravelIsSmooth),
     ("WASD all diagonal releases / continuous native touch / retained fire aim look / mapped origins", fpsKeyboard.testAllDiagonalReleasesKeepOneNativeTouchAndOtherFingers),
-    ("WASD independent axis offsets / linear add and release / tick rates", fpsKeyboard.testIndependentAxesAndLinearTravelAcrossTickRates),
-    ("WASD rapid retarget / no snap / no obsolete trajectory backlog", fpsKeyboard.testRapidRetargetReplacesOldTravelWithoutSnapOrBacklog),
+    ("WASD circular targets / linear add / immediate axis release / tick rates", fpsKeyboard.testCircularTargetsAndLinearTravelAcrossTickRates),
+    ("WASD rapid retarget / no lateral residue / no obsolete trajectory backlog", fpsKeyboard.testRapidRetargetReplacesOldTravelWithoutLateralResidueOrBacklog),
     ("WASD reversal / straight path / constant travel speed", fpsKeyboard.testReversalsTravelStraightAtBoundedSpeed),
     ("WASD stop / canceled anchor and travel / native up / capture release", fpsKeyboard.testStopDuringAnchorOrTravelAndCaptureReleaseCannotResume),
     ("WASD legacy recenter migration / geometry bindings links timing preserved", fpsKeyboard.testLegacyRecenterProfilesKeepLayoutAndUseContinuousWheel),
     ("WASD latest opposing key / fallback / repeat suppression", fpsKeyboard.testOppositeKeysPreferLatestAndRestoreHeldDirection),
-    ("WASD preview / eight independent-axis targets / one native down move up", fpsKeyboard.testMovementPreviewReachesNativeDaemonWithOneFingerLifecycle),
+    ("WASD preview / eight circular targets / one native down move up", fpsKeyboard.testMovementPreviewReachesNativeDaemonWithOneFingerLifecycle),
     ("WASD all-up handoff / coalesced tick / continuous retarget", fpsKeyboard.testAllUpHandoffWithinTickRetargetsWithoutCenterOrLift),
     ("WASD partial diagonal release / short correction / no overshoot", fpsKeyboard.testReleaseDuringPartialDiagonalTravelReturnsWithoutOvershoot),
     ("WASD legacy analog option / independent mouse look / timing persistence", fpsKeyboard.testLegacyMouseJoystickCannotConsumeLookAndSettingsPersist),

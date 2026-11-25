@@ -66,9 +66,9 @@ The app does not synchronize the iPad clipboard to the Mac.
 
 Layout shortcuts: **⌘Z** undo, **⇧⌘Z** redo, **⌘S** save, arrow keys move one pixel, Shift + arrow keys move ten pixels, and + / − resize. **取消** (Cancel) restores the configuration from before editing. A disconnection preserves the layout draft.
 
-The WASD sidebar uses a continuous wheel inspired by QtScrcpy. W+A pushes both axes by their full configured distance. Releasing A slides horizontally back to W without lifting or changing the forward offset. **WASD 推杆过渡** (WASD travel time) defaults to 25 ms for one full axis offset; a complete reversal takes 50 ms. Set it to 0 ms for immediate positioning. A new direction replaces any unfinished movement, and releasing all keys lifts on the next input tick (normally within 8 ms).
+The WASD sidebar uses an independently implemented continuous wheel inspired by QtScrcpy. Straight and diagonal targets remain inside the same circle. Releasing A/D immediately clears the horizontal offset while retaining the movement touch, so W alone points directly forward. **WASD 推杆过渡** (WASD travel time) defaults to 25 ms per radius; a complete reversal takes 50 ms. Set it to 0 ms for immediate positioning. A new direction replaces any unfinished movement, and releasing all keys lifts on the next input tick (normally within 8 ms).
 
-Align the movement center with the game's joystick and adjust **推杆距离** (Travel distance) in the layout inspector until straight and diagonal walking reach the desired speed. Diagonal travel keeps both full offsets, so it reaches farther from the center than straight travel. For predictable steering, use the game's fixed joystick option where available. Existing profiles retain their positions, distances, key mappings and travel time; the old diagonal reset option is no longer used.
+Align the center crosshair with the game's joystick center while no direction is held. Adjust **推杆距离** (Travel distance) within the game's actual joystick travel radius; excessive travel can move a floating joystick's origin. **测试直行 W** (Test W forward) sends W alone for about one second without mouse look, while **测试八向** (Test eight directions) exercises diagonal transitions. If the W-only test drifts, check the center alignment and the game's fixed joystick setting. Existing profiles retain their positions, distances, key mappings and travel time; the old diagonal reset option is no longer used.
 
 ## Manage buttons and links
 
@@ -147,8 +147,8 @@ To publish a version:
 3. Tag that commit with the matching version, for example:
 
    ```sh
-   git tag v1.4.6
-   git push origin v1.4.6
+   git tag v1.4.7
+   git push origin v1.4.7
    ```
 
 4. Actions verifies that the tag matches the app version, builds and validates the package, uploads the Mac ZIP and `SHA256SUMS.txt` to a draft release, then publishes it after both assets are uploaded. The publish job uses GitHub's built-in token; no additional secret is required.

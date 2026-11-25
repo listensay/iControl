@@ -48,7 +48,7 @@ eff873a15d6b5a2afb287111f04a8a89532cb4bf7acbf63b5e3160c8a27753df  com.82flex.tro
 - Project: https://github.com/barry-ran/QtScrcpy
 - Reference implementation: https://github.com/barry-ran/QtScrcpyCore/blob/9e388b8aa48e4e1c2cfdef408ef00c4c6b45c921/src/device/controller/inputconvert/inputconvertgame.cpp
 - Upstream license: Apache-2.0.
-- iControl independently implements the continuous-touch, independent-axis offset and straight-line travel behavior in Swift. No QtScrcpy source or binary is bundled. Travel uses deterministic elapsed time rather than randomized points or timer delays; opposing keys retain iControl’s most-recent-key priority.
+- iControl independently implements a Swift wheel inspired by QtScrcpy's continuous-touch lifecycle and straight-line travel. No QtScrcpy source or binary is bundled. iControl constrains diagonal targets to the displayed circular radius and immediately clears a released axis to avoid residual sideways travel. It uses deterministic elapsed time rather than randomized points or timer delays, and opposing keys retain iControl’s most-recent-key priority.
 
 ## Build tools
 

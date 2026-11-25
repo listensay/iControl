@@ -25,6 +25,102 @@ final class FPSKeyboardMovementTests {
     private func near(_ point: FPSPoint, _ expected: FPSPoint) {
         near(point.x, expected.x); near(point.y, expected.y)
     }
+    private let diagonal = 1 / sqrt(2.0)
+
+    func testDiagonalTrajectoriesStayInsideTheDisplayedJoystickCircle() throws {
+        // A floating joystick that follows a finger outside its travel radius
+        // must never have its origin displaced by iControl's own trajectory.
+        // This is a geometry model, not an assertion about any specific game.
+        let profile = FPSProfile()
+        var engine = try FPSInputEngine(profile: profile); _ = engine.start()
+        var origin = FPSPoint(x: 0, y: 0)
+        let changes: [(String?, String?)] = [
+            ("KeyW", nil), ("KeyD", nil), (nil, "KeyD"), ("KeyA", nil),
+            (nil, "KeyW"), ("KeyS", nil), (nil, "KeyA"), ("KeyD", nil)
+        ]
+        for (index, change) in changes.enumerated() {
+            let now = Double(index) * 0.2
+            if let down = change.0 { _ = engine.keyDown(down, now: now) }
+            if let up = change.1 { _ = engine.keyUp(up, now: now) }
+            for tick in 0..<24 {
+                _ = engine.advance(now: now + Double(tick) / 120)
+                let point = try direction(engine, profile: profile)
+                XCTAssertTrue(hypot(point.x, point.y) <= 1.00001, "A diagonal cannot exceed the displayed travel radius")
+                let dx = point.x - origin.x, dy = point.y - origin.y, distance = hypot(dx, dy)
+                if distance > 1 {
+                    origin.x += dx * (1 - 1 / distance); origin.y += dy * (1 - 1 / distance)
+                }
+                near(origin, .init(x: 0, y: 0))
+            }
+        }
+    }
+
+    func testForwardAfterDiagonalReleaseHasNoLateralOffsetOnTheKeyEdge() throws {
+        let daemon = try NativeFPSFixture(interfaceOrientation: 3), socket = try daemon.connect()
+        defer { socket.close(); daemon.stop() }
+        var sequence: UInt32 = 0
+        for duration in [0.0, 0.025, 0.060] {
+            for side in ["KeyA", "KeyD"] {
+                for releaseAt in [0.212, 0.3] {
+                    var profile = FPSProfile(); profile.keyboardTurnDuration = duration
+                    profile.joystick = .init(x: 0.24151620715305688, y: 0.8042080925587491)
+                    profile.touchMapping.rotation = 1
+                    var engine = try FPSInputEngine(profile: profile); _ = engine.start()
+                    func send(_ frames: [FPSState]) throws {
+                        for frame in frames { sequence += 1; _ = try daemon.send(frame, sequence: sequence, socket: socket) }
+                    }
+                    try send(engine.keyDown("KeyW", now: 0))
+                    for tick in 1...24 {
+                        try send(engine.advance(now: Double(tick) / 120))
+                        near(try direction(engine, profile: profile).x, 0)
+                    }
+                    try send(engine.keyDown("MouseLeft", now: 0.2))
+                    let fire = try XCTUnwrap(engine.state.contacts.first { $0.id == FPSAction.fire.touchID })
+                    try send(engine.keyDown(side, now: 0.2))
+                    try send(engine.advance(now: releaseAt))
+                    let firstFrame = daemon.frames.count
+                    try send(engine.keyUp(side, now: releaseAt))
+                    near(try direction(engine, profile: profile).x, 0)
+                    for tick in 1...24 {
+                        try send(engine.advance(now: releaseAt + Double(tick) / 120))
+                        let point = try direction(engine, profile: profile)
+                        near(point.x, 0); XCTAssertTrue(point.y < 0)
+                        XCTAssertEqual(engine.state.contacts.first { $0.id == fire.id }, fire)
+                    }
+                    let edges = daemon.frames.dropFirst(firstFrame).compactMap { $0.edges[1] }
+                    XCTAssertFalse(edges.isEmpty)
+                    XCTAssertTrue(edges.allSatisfy { $0.kind == "move" }, "Correcting an axis must retain the movement touch")
+                    for edge in edges { near(edge.x, profile.joystick.x, tolerance: 0.00003) }
+                    try send([engine.releaseAll()])
+                }
+            }
+        }
+    }
+
+    func testForwardPreviewKeepsOneVerticalNativeTouchWithoutMouseInput() throws {
+        var profile = FPSProfile(); profile.touchMapping.rotation = 1
+        let frames = try FPSInputPreview.forward(profile: profile, aspect: 4.0 / 3.0)
+        let daemon = try NativeFPSFixture(interfaceOrientation: 3), socket = try daemon.connect()
+        defer { socket.close(); daemon.stop() }
+        XCTAssertEqual(frames.count, 62)
+        XCTAssertTrue(frames.dropLast().allSatisfy { $0.contacts.map(\.id) == [1] })
+        XCTAssertTrue(frames.last!.contacts.isEmpty)
+        for (index, frame) in frames.enumerated() {
+            _ = try daemon.send(frame, sequence: UInt32(index + 1), socket: socket)
+        }
+        let edges = daemon.frames.compactMap { $0.edges[1] }
+        XCTAssertEqual(edges.filter { $0.kind == "down" }.count, 1)
+        XCTAssertEqual(edges.filter { $0.kind == "up" }.count, 1)
+        XCTAssertTrue(edges.contains { $0.kind == "move" })
+        for edge in edges {
+            near(edge.x, profile.joystick.x, tolerance: 0.00003)
+            XCTAssertTrue(edge.y <= profile.joystick.y + 0.00003)
+            XCTAssertTrue(edge.y >= profile.joystick.y - profile.joystickRadius - 0.00003)
+        }
+        XCTAssertEqual(daemon.frames.last?.active, 0)
+        profile.joystickEnabled = false
+        XCTAssertThrowsError(try FPSInputPreview.forward(profile: profile, aspect: 4.0 / 3.0))
+    }
 
     func testCenterDownSurvivesRapidEdgesAndInitialTravelIsSmooth() throws {
         let profile = FPSProfile()
@@ -38,7 +134,7 @@ final class FPSKeyboardMovementTests {
         let first = try direction(engine, profile: profile)
         near(first, .init(x: -1.0 / 3, y: -1.0 / 3))
         _ = engine.advance(now: 1.05)
-        near(try direction(engine, profile: profile), .init(x: -1, y: -1))
+        near(try direction(engine, profile: profile), .init(x: -diagonal, y: -diagonal))
         XCTAssertTrue(engine.state.contacts.contains { $0.id == FPSAction.fire.touchID })
         XCTAssertTrue(engine.advance(now: 1.06).isEmpty, "A settled wheel must not jitter or resend stationary positions")
     }
@@ -64,16 +160,15 @@ final class FPSKeyboardMovementTests {
                     try send(engine.advance(now: 0.1))
                     try send(engine.keyDown(horizontal, now: 0.2))
                     try send(engine.advance(now: 0.3))
-                    near(try direction(engine, profile: profile, aspect: aspect), .init(x: x, y: y))
+                    near(try direction(engine, profile: profile, aspect: aspect), .init(x: x * diagonal, y: y * diagonal))
                     try send(engine.keyDown("MouseLeft", now: 1))
                     try send(engine.keyDown("MouseRight", now: 1))
                     engine.mouseMoved(dx: 3, dy: 2, now: 1); try send(engine.advance(now: 1))
                     let fire = try XCTUnwrap(engine.state.contacts.first { $0.id == FPSAction.fire.touchID })
                     let aim = try XCTUnwrap(engine.state.contacts.first { $0.id == FPSAction.aim.touchID })
                     try send(engine.keyUp(releaseHorizontal ? horizontal : vertical, now: 1.001))
-                    if duration > 0 {
-                        near(try direction(engine, profile: profile, aspect: aspect), .init(x: x, y: y))
-                    }
+                    let released = try direction(engine, profile: profile, aspect: aspect)
+                    near(releaseHorizontal ? released.x : released.y, 0)
                     var intermediate = false
                     for tick in 1...24 {
                         let now = 1.001 + Double(tick) / 120
@@ -81,15 +176,19 @@ final class FPSKeyboardMovementTests {
                         try send(engine.advance(now: now))
                         let vector = try direction(engine, profile: profile, aspect: aspect)
                         let releasedValue = releaseHorizontal ? abs(vector.x) : abs(vector.y)
-                        if releasedValue > 0.00001 && releasedValue < 0.99999 { intermediate = true }
-                        // The still-held axis keeps its full offset throughout.
-                        if releaseHorizontal { near(vector.y, y) } else { near(vector.x, x) }
-                        XCTAssertTrue((0...1.00001).contains(releasedValue))
+                        let retainedValue = releaseHorizontal ? abs(vector.y) : abs(vector.x)
+                        if retainedValue > diagonal + 0.00001 && retainedValue < 0.99999 { intermediate = true }
+                        // There is no residual movement along the released axis.
+                        near(releasedValue, 0)
+                        XCTAssertTrue((diagonal - 0.00001...1.00001).contains(retainedValue))
+                        XCTAssertTrue(hypot(vector.x, vector.y) <= 1.00001)
                         XCTAssertEqual(engine.state.contacts.first { $0.id == fire.id }, fire)
                         XCTAssertEqual(engine.state.contacts.first { $0.id == aim.id }, aim)
                         XCTAssertTrue(engine.state.contacts.contains { $0.id == 2 })
                     }
-                    XCTAssertEqual(intermediate, duration > 0)
+                    // A short correction may complete between two timer ticks.
+                    if duration == 0 { XCTAssertFalse(intermediate) }
+                    if duration == 0.060 { XCTAssertTrue(intermediate) }
                     let expected = FPSPoint(x: releaseHorizontal ? 0 : x, y: releaseHorizontal ? y : 0)
                     near(try direction(engine, profile: profile, aspect: aspect), expected)
                     let native = try XCTUnwrap(daemon.frames.reversed().compactMap { $0.edges[1] }.first)
@@ -112,7 +211,7 @@ final class FPSKeyboardMovementTests {
         }
     }
 
-    func testIndependentAxesAndLinearTravelAcrossTickRates() throws {
+    func testCircularTargetsAndLinearTravelAcrossTickRates() throws {
         for rate in [60.0, 120.0, 240.0] {
             var profile = FPSProfile(); profile.keyboardTurnDuration = 0.060
             var engine = try FPSInputEngine(profile: profile); _ = engine.start()
@@ -122,39 +221,45 @@ final class FPSKeyboardMovementTests {
                 let elapsed = Double(tick) / rate
                 _ = engine.advance(now: 0.2 + elapsed)
                 let vector = try direction(engine, profile: profile)
-                near(vector.y, -1, tolerance: 0.00001)
-                near(vector.x, min(1, elapsed / 0.060))
+                let progress = min(1, elapsed / (0.060 * diagonal))
+                near(vector.x, diagonal * progress)
+                near(vector.y, -1 + (1 - diagonal) * progress)
+                XCTAssertTrue(hypot(vector.x, vector.y) <= 1.00001)
             }
             _ = engine.keyUp("KeyD", now: 0.4)
+            near(try direction(engine, profile: profile).x, 0)
             for tick in 1...Int(rate * 0.1) {
                 let elapsed = Double(tick) / rate
                 _ = engine.advance(now: 0.4 + elapsed)
-                near(try direction(engine, profile: profile), .init(x: max(0, 1 - elapsed / 0.060), y: -1))
+                near(try direction(engine, profile: profile), .init(x: 0, y: -min(1, diagonal + elapsed / 0.060)))
             }
         }
     }
 
-    func testRapidRetargetReplacesOldTravelWithoutSnapOrBacklog() throws {
+    func testRapidRetargetReplacesOldTravelWithoutLateralResidueOrBacklog() throws {
         var profile = FPSProfile(); profile.keyboardTurnDuration = 0.060
         var engine = try FPSInputEngine(profile: profile); _ = engine.start()
         _ = engine.keyDown("KeyW", now: 0); _ = engine.advance(now: 0.1)
         _ = engine.keyDown("KeyA", now: 0.2); _ = engine.advance(now: 0.218)
-        near(try direction(engine, profile: profile), .init(x: -0.3, y: -1))
+        let initialY = -1 + (1 - diagonal) * 0.3 / diagonal
+        near(try direction(engine, profile: profile), .init(x: -0.3, y: initialY))
         _ = engine.keyUp("KeyA", now: 0.218)
-        near(try direction(engine, profile: profile), .init(x: -0.3, y: -1))
+        near(try direction(engine, profile: profile), .init(x: 0, y: initialY))
         _ = engine.keyDown("KeyD", now: 0.218)
-        near(try direction(engine, profile: profile), .init(x: -0.3, y: -1))
+        near(try direction(engine, profile: profile), .init(x: 0, y: initialY))
         _ = engine.advance(now: 0.248)
-        near(try direction(engine, profile: profile), .init(x: 0.2, y: -1))
+        let secondY = initialY + (-diagonal - initialY) * 0.5 / diagonal
+        near(try direction(engine, profile: profile), .init(x: 0.5, y: secondY))
         _ = engine.keyDown("KeyA", now: 0.248)
         for tick in 1...12 {
             _ = engine.advance(now: 0.248 + Double(tick) / 120)
             let vector = try direction(engine, profile: profile)
-            near(vector.y, -1); XCTAssertTrue(vector.x <= 0.2 + 0.00001 && vector.x >= -1.00001)
+            XCTAssertTrue(vector.x <= 0.5 + 0.00001 && vector.x >= -diagonal - 0.00001)
+            XCTAssertTrue(hypot(vector.x, vector.y) <= 1.00001)
         }
-        near(try direction(engine, profile: profile), .init(x: -1, y: -1))
+        near(try direction(engine, profile: profile), .init(x: -diagonal, y: -diagonal))
         _ = engine.advance(now: 5)
-        near(try direction(engine, profile: profile), .init(x: -1, y: -1))
+        near(try direction(engine, profile: profile), .init(x: -diagonal, y: -diagonal))
     }
 
     func testReversalsTravelStraightAtBoundedSpeed() throws {
@@ -248,8 +353,8 @@ final class FPSKeyboardMovementTests {
         XCTAssertEqual(edges.filter { $0.kind == "up" }.count, 1)
         XCTAssertTrue(edges.filter { $0.kind == "move" }.count > 8)
         XCTAssertEqual(daemon.frames.last?.active, 0)
-        let targets: [FPSPoint] = [.init(x: 0, y: -1), .init(x: 1, y: -1), .init(x: 1, y: 0), .init(x: 1, y: 1),
-                                   .init(x: 0, y: 1), .init(x: -1, y: 1), .init(x: -1, y: 0), .init(x: -1, y: -1)]
+        let targets: [FPSPoint] = [.init(x: 0, y: -1), .init(x: diagonal, y: -diagonal), .init(x: 1, y: 0), .init(x: diagonal, y: diagonal),
+                                   .init(x: 0, y: 1), .init(x: -diagonal, y: diagonal), .init(x: -1, y: 0), .init(x: -diagonal, y: -diagonal)]
         for (index, expected) in targets.enumerated() {
             let visible = FPSPoint(x: profile.joystick.x + expected.x * profile.joystickRadius / (4.0 / 3.0),
                                    y: profile.joystick.y + expected.y * profile.joystickRadius)
@@ -283,10 +388,11 @@ final class FPSKeyboardMovementTests {
         var engine = try FPSInputEngine(profile: profile); _ = engine.start()
         _ = engine.keyDown("KeyW", now: 0); _ = engine.advance(now: 0.1)
         _ = engine.keyDown("KeyD", now: 0.2); _ = engine.advance(now: 0.212)
-        near(try direction(engine, profile: profile), .init(x: 0.2, y: -1))
+        near(try direction(engine, profile: profile), .init(x: 0.2, y: -1 + (1 - diagonal) * 0.2 / diagonal))
         _ = engine.keyUp("KeyD", now: 0.212)
+        near(try direction(engine, profile: profile).x, 0)
         _ = engine.advance(now: 0.218)
-        near(try direction(engine, profile: profile), .init(x: 0.1, y: -1))
+        near(try direction(engine, profile: profile), .init(x: 0, y: -1))
         _ = engine.advance(now: 0.225)
         near(try direction(engine, profile: profile), .init(x: 0, y: -1))
         XCTAssertTrue(engine.advance(now: 0.3).isEmpty)

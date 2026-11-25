@@ -13,6 +13,12 @@ canvas { outline: none; }
 .fps-marker-key { max-width: 100%; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 .fps-marker::before { content: ''; position: absolute; inset: calc(0px - var(--grip-offset, 0px)); border-radius: inherit; }
 .fps-marker.joystick { border: 2px solid #84ccff; padding: 0; }
+.fps-marker.joystick .fps-marker-key { position: absolute; top: calc(50% + 9px); }
+.fps-joystick-forward { position: absolute; top: 0; left: 50%; height: 50%; border-left: 1px dashed #b4e2ff; pointer-events: none; }
+.fps-joystick-center { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; transform: translate(-50%, -50%); pointer-events: none; }
+.fps-joystick-center::before, .fps-joystick-center::after { content: ''; position: absolute; background: #fff; box-shadow: 0 0 2px #000; }
+.fps-joystick-center::before { left: 0; top: 6px; width: 14px; height: 2px; }
+.fps-joystick-center::after { left: 6px; top: 0; width: 2px; height: 14px; }
 .fps-marker.look { border-radius: 6px; width: auto; min-width: 72px; padding: 0 8px; }
 .fps-marker.selected { border-color: #ffc568; color: #ffe2a8; box-shadow: 0 0 0 5px #ffba462a; }
 .fps-marker.disabled { opacity: .4; border-style: dashed; }

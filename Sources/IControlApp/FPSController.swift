@@ -534,6 +534,12 @@ final class FPSController: ObservableObject {
             runLayoutTest(try FPSInputPreview.movement(profile: editor.draft, aspect: aspect), title: "WASD 八向换向")
         } catch { layoutError = error.localizedDescription }
     }
+    func testLayoutForward() {
+        guard let editor = layoutEditor else { return }
+        do {
+            runLayoutTest(try FPSInputPreview.forward(profile: editor.draft, aspect: aspect), title: "W 直行（无鼠标转向）")
+        } catch { layoutError = error.localizedDescription }
+    }
     private func runLayoutTest(_ frames: [FPSState], title: String) {
         guard isEditingLayout, !captured, !layoutSaving, videoReady, ready, let currentLink = link else {
             layoutError = "连接 iPad 画面和 FPS 输入通道后才能测试"; return

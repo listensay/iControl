@@ -106,4 +106,20 @@ public enum FPSInputPreview {
         frames.append(engine.releaseAll())
         return frames
     }
+
+    /// W alone for one second, without mouse input or any other action. This
+    /// distinguishes center alignment from a diagonal-to-forward transition.
+    public static func forward(profile: FPSProfile, aspect: Double) throws -> [FPSState] {
+        guard profile.joystickEnabled else { throw ControlError("请先启用 WASD 移动映射") }
+        var engine = try FPSInputEngine(profile: profile)
+        engine.setAspect(aspect); _ = engine.start()
+        _ = engine.keyDown("KeyW", now: 0)
+        var frames = [engine.state]
+        for tick in 1...60 {
+            _ = engine.advance(now: Double(tick) * interval); frames.append(engine.state)
+        }
+        _ = engine.keyUp("KeyW", now: 1)
+        _ = engine.advance(now: 1); frames.append(engine.state)
+        return frames
+    }
 }
