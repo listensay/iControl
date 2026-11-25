@@ -2,6 +2,9 @@
 set -euo pipefail
 ICONTROL_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ICONTROL_ROOT"
+test "$(uname -m)" = arm64 || { printf 'Mac packaging requires an Apple Silicon host.\n' >&2; exit 1; }
+python3 Tools/check-release-version.py
+python3 Tools/verify-docs.py
 ICONTROL_DIST="$ICONTROL_ROOT/dist"
 ICONTROL_APP="$ICONTROL_DIST/iControl.app"
 ICONTROL_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ICONTROL_ROOT/Resources/Info.plist")"
@@ -21,7 +24,12 @@ mkdir -p "$ICONTROL_STAGING/Contents/MacOS" "$ICONTROL_STAGING/Contents/Resource
 cp "$ICONTROL_BIN_DIR/iControl" "$ICONTROL_STAGING/Contents/MacOS/iControl"
 cp "$ICONTROL_ROOT/Resources/Info.plist" "$ICONTROL_STAGING/Contents/Info.plist"
 ditto "$ICONTROL_BIN_DIR/iControl_IControlApp.bundle" "$ICONTROL_STAGING/Contents/Resources/iControl_IControlApp.bundle"
-cp "$ICONTROL_ROOT/README.md" "$ICONTROL_STAGING/Contents/Resources/iControl_IControlApp.bundle/Resources/README.md"
+ICONTROL_DOC_ROOT="$ICONTROL_STAGING/Contents/Resources/iControl_IControlApp.bundle/Resources"
+for ICONTROL_DOC in README.md README.zh-CN.md LICENSE THIRD_PARTY_NOTICES.md; do
+  cp "$ICONTROL_ROOT/$ICONTROL_DOC" "$ICONTROL_DOC_ROOT/$ICONTROL_DOC"
+done
+ditto --norsrc "$ICONTROL_ROOT/docs" "$ICONTROL_DOC_ROOT/docs"
+python3 Tools/verify-docs.py "$ICONTROL_DOC_ROOT"
 ICONTROL_ICONSET="$ICONTROL_ROOT/work/AppIcon.iconset"
 mkdir -p "$ICONTROL_ICONSET"
 swift "$ICONTROL_ROOT/Scripts/make-icon.swift" "$ICONTROL_ICONSET"

@@ -135,7 +135,7 @@ struct ContentView: View {
                 }.labelsHidden().font(.system(size: 11))
                 Button { fps.beginLayoutEditing() } label: {
                     Label("拖拽布局…", systemImage: "cursorarrow.and.square.on.square.dashed").frame(maxWidth: .infinity)
-                }.buttonStyle(PrimaryActionButtonStyle()).disabled(!fps.videoReady).font(.system(size: 12))
+                }.buttonStyle(PrimaryActionButtonStyle()).disabled(!fps.videoReady).font(.system(size: 12, weight: .semibold))
                 HStack {
                     Button("按键与灵敏度…") { fps.showSettings = true }
                     Spacer()
@@ -146,8 +146,9 @@ struct ContentView: View {
                 }.font(.system(size: 11))
                 Toggle("显示触控位置", isOn: $fps.showMarkers).toggleStyle(.checkbox).font(.system(size: 11))
                 Button { fps.showGameCursor() } label: {
-                    Label("呼出鼠标", systemImage: "cursorarrow").frame(maxWidth: .infinity)
-                }.disabled(!fps.ready || fps.calibration != nil)
+                    Label(fps.cursorMode ? "鼠标已呼出" : "呼出鼠标", systemImage: fps.cursorMode ? "cursorarrow.click" : "cursorarrow").frame(maxWidth: .infinity)
+                }.buttonStyle(CursorActionButtonStyle(isActive: fps.cursorMode))
+                    .disabled(!fps.ready || fps.calibration != nil)
                     .help("显示鼠标后左键点击游戏；按 \(FPSKey.title(fps.profile.cursorToggleKey)) 恢复转向")
                     .font(.system(size: 12))
                 Text("\(FPSKey.title(fps.profile.cursorToggleKey)) 呼出 / 收回鼠标")
@@ -181,11 +182,18 @@ struct ContentView: View {
                 Spacer()
                 if fps.enabled {
                     Button { fps.showGameCursor() } label: {
-                        Label("呼出鼠标", systemImage: "cursorarrow")
-                    }.disabled(!fps.ready || fps.isEditingLayout || fps.calibration != nil)
+                        Label(fps.cursorMode ? "鼠标已呼出" : "呼出鼠标", systemImage: fps.cursorMode ? "cursorarrow.click" : "cursorarrow")
+                            .fixedSize()
+                    }.buttonStyle(CursorActionButtonStyle(isActive: fps.cursorMode))
+                        .font(.system(size: 12))
+                        .disabled(!fps.ready || fps.isEditingLayout || fps.calibration != nil)
                         .help("左键点击游戏；按 \(FPSKey.title(fps.profile.cursorToggleKey)) 恢复转向")
                 }
-                Button("拖拽布局…") { fps.beginLayoutEditing() }
+                Button { fps.beginLayoutEditing() } label: {
+                    Label("拖拽布局…", systemImage: "cursorarrow.and.square.on.square.dashed")
+                        .fixedSize()
+                }.buttonStyle(PrimaryActionButtonStyle())
+                    .font(.system(size: 12, weight: .semibold))
                     .disabled(!fps.videoReady || fps.isEditingLayout)
                 Button { model.viewerDriver.home() } label: { Image(systemName: "house") }
                     .help("返回 iPad 主屏幕").disabled(!model.viewerConnected)

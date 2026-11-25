@@ -1,82 +1,90 @@
 # iControl
 
-原生 Mac 应用，通过 USB 在应用内查看和控制越狱 iPad。支持普通键鼠操作、FPS 多点触摸、WASD 移动、鼠标转向、动作映射、滑动按钮和按键联动。
+**Control a jailbroken iPad with your Mac keyboard and mouse over USB.**
 
-当前 Mac 版本：**1.4.4（12）**。最低 macOS 14，面向 Apple Silicon。iPad FPS 控制端为 **1.4.0**；这次界面更新无需重装已升级的设备端。
+English · [简体中文](README.zh-CN.md)
 
-## 连接
+A native macOS app with an integrated iPad display, editable touch mappings, and simultaneous movement, aiming, and actions for FPS games. SwiftUI provides the desktop controls; WebKit and noVNC display the game; a dedicated iPad daemon delivers multi-touch input.
 
-1. 用 USB 数据线连接 iPad，保持解锁并信任这台 Mac。
-2. 首次配置时，在越狱 iPad 上安装 OpenSSH 和 PreferenceLoader。打开 **安装 / 配置控制端**，输入具有 root 或 sudo 权限的 SSH 账户，检测环境后安装。保留 **安装 FPS 多点触摸控制端（含 iPad 游戏指针）**。
-3. 已有控制端时，直接点 **连接 iPad**。需要认证时弹出控制密码窗口；密码不显示在左侧栏。可将控制密码保存到 Mac 钥匙串。
+[Download for Mac](https://github.com/listensay/icontrol/releases) · [Prerequisites & setup guide](docs/SETUP.md) · [中文准备与使用教程](docs/SETUP.zh-CN.md)
 
-连接状态和 README 入口位于 **iPad 画面** 工具栏右侧。不可用的按钮显示为灰色。断线自动重连会等待同一台设备重新接入；iPad 重启后需要先恢复越狱环境。系统屏幕共享保留为备用画面客户端。
+Mac **1.4.5 (13)** · Apple Silicon · macOS 14+ · iPad FPS daemon **1.4.0**
 
-画面服务使用 iPad 回环端口 5901，FPS 输入使用 5902，Mac 转发服务仅监听回环地址。安装默认请求 65% 分辨率、60 FPS，实际画质和延迟取决于设备与游戏。
+## In the game
 
-## FPS 设置与布局
+![iControl editing touch mappings over a real iPad game](docs/images/in-game-layout.png)
 
-进入游戏并固定画面方向后，打开 **拖拽布局…**。在画面中拖动移动中心、转向区域、动作按钮和滑动起止点；拖动角点调整大小。位置不提供 X/Y 数值编辑。
+The layout editor on a real game screen. This screenshot was supplied by the user, with the account identifier blurred; the application UI currently uses Chinese labels. The editable overlay belongs to iControl, and the underlying game belongs to its respective publisher.
 
-布局侧栏集中提供转向区域尺寸、鼠标轴、移动半径、WASD 换向与归位选项、滑动方向 / 距离 / 时长，以及触点坐标校准。**按键与灵敏度…** 使用两个 TAB：
+## Features
 
-- **鼠标与移动**：灵敏度、呼出鼠标快捷键、画面方向、滚轮切换武器，以及转向 / 移动映射开关。
-- **动作与联动**：动作按钮的添加、搜索、改名、改键、触屏方式、启停和删除，以及按键联动。
+- **One window for display and control.** USB device selection, embedded video, connection status, full screen, and an optional macOS Screen Sharing client.
+- **Simultaneous game input.** WASD movement, relative mouse look, and separate touch contacts for firing, aiming, and other actions.
+- **Visual layout editing.** Drag the joystick center, look region, buttons, and swipe endpoints directly over the game. Resize with corner handles; undo, redo, and save a layout draft.
+- **Complete mapping management.** Add, search, rename, rebind, enable, disable, or delete presets and up to 32 custom buttons per profile. Hold, tap, and swipe are supported; deleted presets can be restored.
+- **Linked actions and game cursor.** One key can trigger several mapped actions and toggle the cursor. Cursor mode lets the mouse click and drag game menus while keyboard actions remain available.
+- **Profiles and recovery.** Copy profiles, keep settings drafts across tabs, reconnect to the same USB device, and release input when capture ends or the connection is lost.
 
-切换 TAB 保留当前草稿，点击 **保存** 才应用设置。几何尺寸和滑动路径统一在拖拽布局编辑。每套配置最多 32 个自定义按钮，删除的预设可从 **添加映射** 恢复。
+## Interface
 
-布局编辑支持 **⌘Z** 撤销、**⇧⌘Z** 重做、**⌘S** 保存；方向键微调 1 像素，Shift 加快至 10 像素，＋ / − 调整大小。取消恢复进入编辑前的配置。断线时布局草稿保留。使用 **测试点击**、**测试向右 / 测试向下** 或 **测试 WASD 换向** 检查实际触摸。
+The game toolbar gives **Edit layout (拖拽布局)** a filled blue button and **Show cursor (呼出鼠标)** an outlined blue button. The cursor label reflects its active state; unavailable actions remain gray.
 
-## 游戏输入
+![Highlighted layout and cursor controls](docs/images/game-controls.png)
 
-| Mac 操作 | 游戏动作 |
+Settings separate input preferences from action mappings. Geometry and swipe paths remain in the visual layout editor.
+
+| Mouse & movement | Actions & links |
 | --- | --- |
-| WASD | 前后左右移动，组合键斜走，相反方向优先响应后按的键 |
-| 鼠标移动 | 转视角 |
-| 鼠标左 / 右键 | 默认开火 / 开镜 |
-| 空格 / Ctrl / Shift | 默认跳跃 / 蹲下 / 冲刺 |
-| R / F / Z | 默认换弹 / 交互 / 趴下 |
-| 1 / 2 或滚轮 | 默认切换武器 |
-| 反引号键 ` / ~ | 呼出 / 收回游戏鼠标，可修改快捷键 |
-| F8 | 捕获 / 释放输入 |
-| Esc | 可作为普通游戏映射按键 |
+| ![Sensitivity, cursor shortcut, orientation and WASD settings](docs/images/mouse-and-movement.png) | ![Searchable action mappings with editable keys and touch modes](docs/images/actions-and-links.png) |
 
-默认保留 WASD 松键归位修正：例如持续 W+A 后松开 A，移动触点单独抬起，在设定的游戏移动中心重新按下，再推向 W 的正前方。归位通常约 33–50 ms；开火、开镜和视角触点继续响应。可在布局侧栏关闭 **斜走松键时重置摇杆中心**，或调整 **WASD 换向过渡**。移动中心需要对准游戏摇杆中心。
+<details>
+<summary>View linked action settings</summary>
 
-**滑动按钮**在按键按下后完成一次按下、滑动、抬起。起点和终点可在画面中拖动，支持斜向路径；松开按键仍完成滑动。其他移动和动作触点同时保留。
+![Linked keys and cursor toggle targets](docs/images/key-links.png)
 
-**按键联动**可设置 B → Esc 和 B → 呼出 / 收回游戏内鼠标，按 B 同时触发对应动作。松开主键一起释放按住型按钮；其他按住的主键仍可保留目标触点。点按和滑动按各自方式完成，鼠标模式只在按下时切换。
+</details>
 
-**呼出鼠标**后，鼠标移动定位指针，左键点击或拖动游戏界面；再次按快捷键恢复转视角。WASD 和键盘动作继续可用。iPad 本机显示指针需要 1.4.0 设备端；旧服务可通过 **安装 / 配置控制端** 升级。设备端显示失败时仍保留触摸输入。
+## Architecture
 
-F8、切换窗口、断线和退出应用会释放全部输入；设备端超过 350 ms 未收到有效数据也会释放触点。真实游戏的触摸识别和持续操作效果需在设备上确认。
-
-## 普通操作与密码
-
-关闭 FPS 模式后，左键触摸、按住拖动、滚轮滑动、右键返回主屏幕，中键对应电源键。工具栏还提供主屏幕、锁屏、全屏和 **发送文本**；后者是手动发送文本到 iPad 输入框。应用已移除 iPad 到 Mac 的剪贴板同步。
-
-SSH 密码仅用于本次安装操作。画面控制密码和 FPS 凭据按设备保存到 Mac 钥匙串；经典 VNC 使用前 8 位密码，安装时生成独立的 8 位控制密码。安装前配置备份在 iPad 的 `/var/mobile/Library/iControl/`，安装窗口的 **恢复原配置** 可恢复已有配置。
-
-## 构建与验证
-
-需要 Apple Command Line Tools 和 Swift 6。设备端脚本使用 arm64 iOS 14+ 目标，可通过 `ICONTROL_IPHONE_SDK` 和 `ICONTROL_LDID_PATH` 指定工具链；首次构建会在 `work/toolchain/` 获取固定版本 SDK 和 ldid。
-
-```sh
-./Scripts/test.sh
-node Tools/verify-fps-overlay.mjs
-node Tools/verify-fps-viewer-lifecycle.mjs
-./Scripts/build-app.sh
-swift run -Xswiftc -enable-testing iControlValidation \
-  --check-native-askpass dist/iControl.app/Contents/MacOS/iControl
-./Scripts/archive-source.sh
+```mermaid
+flowchart LR
+    UI[SwiftUI desktop controls] --> Core[Swift input and connection core]
+    UI --> Web[WebKit · noVNC viewer]
+    Core --> USB[USB transport · usbmuxd]
+    Web --> Local[Mac loopback forwarder]
+    Local --> USB
+    USB --> VNC[iPad TrollVNC · 5901]
+    USB --> FPS[iPad FPS daemon · 5902]
+    VNC --> Screen[iPad display]
+    FPS --> HID[HID multi-touch and game cursor]
 ```
 
-测试覆盖 USB / VNC / SSH、安装恢复、FPS 多点输入、WASD 换向、布局草稿、按键联动、滑动、设备指针及画面生命周期。测试输出到终端；项目不保留历史验证报告和独立教程。
+Display and FPS input travel through separate connections. The VNC viewer handles video and ordinary desktop interaction; the FPS engine sends touch snapshots directly to the daemon. The local web server and forwarding ports bind to loopback addresses.
 
-交付文件为 `dist/iControl.app`、`dist/iControl-1.4.4-mac.zip` 和 `dist/iControl-1.4.4-source.zip`。在 `dist/` 执行 `shasum -a 256 -c SHA256SUMS.txt` 核对压缩包。安装时退出旧应用，替换 `/Applications/iControl.app` 后重新打开。
+| Component | Location | Role |
+| --- | --- | --- |
+| Desktop app | `Sources/IControlApp` | SwiftUI, WebKit bridge, capture, settings, installer, and Keychain integration |
+| Core | `Sources/IControlCore` | USB/VNC/SSH connections, profiles, layout drafts, and multi-touch input |
+| Native transport | `Sources/CTransport` | Socket and platform transport support |
+| Device service | `Device/FPSDaemon` | Independent arm64 iOS service for touch injection and the device cursor |
+| Viewer | `Sources/IControlApp/Resources/Viewer` | Bundled noVNC client and editable mapping overlay |
+| Validation | `Tests`, `Tools/Simulator` | Protocol, input lifecycle, installation, layout, and simulator checks |
 
-## 源码与许可
+## Technical details
 
-`Sources/IControlApp` 为 SwiftUI 和 WebKit 界面，`Sources/IControlCore` 为通信与输入逻辑，`Device/FPSDaemon` 为 iPad 服务，`Tests` 与 `Tools/Simulator` 为验证工具。模拟设备只用于开发验证。
+- **Device targets:** the Mac package targets Apple Silicon and macOS 14+. The FPS daemon targets arm64 iOS 14+ and requires a compatible jailbreak. Actual compatibility depends on the device and jailbreak environment; setup requirements are in the [guide](docs/SETUP.md).
+- **Video:** the installer requests 65% display scale and 60 FPS by default. These are requested settings, not a measured frame rate or latency guarantee.
+- **Input lifecycle:** actions own distinct touch contacts. Linked hold actions retain a shared target until all owners release it; tap and swipe actions complete their own gesture. A configurable WASD reset can lift and re-center only the movement contact after leaving a diagonal.
+- **Release behavior:** ending capture, deactivating the app, disconnecting, or exiting releases touches. The device watchdog releases contacts after 350 ms without valid input.
+- **Credentials:** SSH credentials are used for the installation operation. Saved VNC passwords and FPS credentials are scoped to a device in the Mac Keychain. Classic VNC uses eight password characters; installation generates a separate control password.
+- **Packaging:** the viewer, device packages, FPS daemon, required third-party sources and licenses, and both documentation languages are included in the Mac app. The package is ad-hoc signed; Developer ID signing and notarization are not configured.
 
-README 是项目唯一使用说明。法律声明保留在 `LICENSE`、`THIRD_PARTY_NOTICES.md` 和第三方资源许可证中。Mac 原始代码采用 MIT；独立 iPad FPS 服务采用 GPL-2.0-only；Apple HID ABI 声明保留 BSD 许可证。画面服务使用官方 TrollVNC 3.2-272，内置客户端使用 noVNC，源码与许可随应用提供。
+## Mac builds and releases
+
+[GitHub Actions](https://github.com/listensay/icontrol/actions/workflows/mac.yml) validates the core, checks the viewer scripts and documentation, rebuilds the bundled daemon, and packages the Mac app. Pushes and pull requests produce a downloadable build artifact. A `vMAJOR.MINOR.PATCH` tag matching the app metadata publishes a GitHub Release with **the Mac ZIP and `SHA256SUMS.txt`**. No separate iOS package or source ZIP is uploaded by this workflow.
+
+The workflow runs on an arm64 `macos-15` runner, verifies package resources and signing, and requires no signing secrets. Build commands and the release procedure are in the [source build guide](docs/SETUP.md#build-and-release-from-source).
+
+## License
+
+Original Mac code is [MIT licensed](LICENSE). The independent iPad FPS daemon is **GPL-2.0-only**, with BSD notices retained for Apple HID declarations. TrollVNC 3.2-272 and noVNC retain their respective licenses; their required sources and notices ship with the app. See [third-party notices](THIRD_PARTY_NOTICES.md) and the licenses in `Sources/IControlApp/Resources`.

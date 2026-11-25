@@ -14,6 +14,23 @@ struct PrimaryActionButtonStyle: ButtonStyle {
     }
 }
 
+struct CursorActionButtonStyle: ButtonStyle {
+    var isActive: Bool
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .fontWeight(.semibold)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .foregroundStyle(isEnabled ? Color.accentColor : Color.gray)
+            .background(isEnabled ? Color.accentColor.opacity(configuration.isPressed ? 0.22 : (isActive ? 0.16 : 0.07)) : Color.gray.opacity(0.20),
+                        in: RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6)
+                .stroke(isEnabled ? Color.accentColor.opacity(0.65) : Color.gray.opacity(0.25), lineWidth: 1))
+    }
+}
+
 struct ToolbarActionButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 

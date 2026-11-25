@@ -1,0 +1,87 @@
+name: Build and release Mac
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+      - name: Check architecture and version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          test "$(uname -m)" = arm64
+          swift --version
+          if [ "$REF_TYPE" = tag ]; then
+            python3 Tools/check-release-version.py --tag "$REF_NAME"
+          else
+            python3 Tools/check-release-version.py
+          fi
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: work/toolchain
+          key: ios-toolchain-arm64-${{ hashFiles('Scripts/prepare-ios-toolchain.sh') }}
+      - name: Validate core, viewer, and documentation
+        run: |
+          ./Scripts/test.sh
+          node Tools/verify-fps-overlay.mjs
+          node Tools/verify-fps-viewer-lifecycle.mjs
+          python3 Tools/verify-docs.py
+          python3 Tools/verify-release-workflow.py
+      - name: Package Mac app
+        run: |
+          ./Scripts/build-app.sh
+          swift run -Xswiftc -enable-testing iControlValidation \
+            --check-native-askpass dist/iControl.app/Contents/MacOS/iControl
+          cd dist
+          shasum -a 256 -c SHA256SUMS.txt
+          unzip -t iControl-*-mac.zip
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: iControl-mac
+          path: |
+            dist/iControl-*-mac.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: iControl-mac
+          path: dist
+      - name: Publish verified Mac assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: ./Scripts/publish-mac-release.sh "$RELEASE_TAG"

@@ -3,8 +3,8 @@ import AppKit
 import IControlCore
 
 enum AppResources {
-    static let version = "1.4.4"
-    static var build: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "12" }
+    static let version = "1.4.5"
+    static var build: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "13" }
     static func openReadme() {
         NSWorkspace.shared.open(root.appendingPathComponent("README.md"))
     }
@@ -35,7 +35,7 @@ enum CommandLineMode {
         if CommandLine.arguments.contains("--verify-resources") {
             do {
                 let root = AppResources.root
-                for file in ["Viewer/index.html", "Viewer/viewer.js", "Viewer/fps-overlay.js", "Viewer/novnc/core/rfb.js", "Licenses/noVNC-LICENSE.MPL-2.0.txt", "ThirdPartySources/TrollVNC-v3.2-272-source.tar.gz", "FPSDaemon/COPYING", "FPSDaemon/HIDBridge.h", "FPSDaemon/CursorHosting-NOTICE.txt", "ThirdPartySources/iControl-FPSDaemon-1.4.0-source.tar.gz"] {
+                for file in ["README.md", "README.zh-CN.md", "docs/SETUP.md", "docs/SETUP.zh-CN.md", "Viewer/index.html", "Viewer/viewer.js", "Viewer/fps-overlay.js", "Viewer/novnc/core/rfb.js", "Licenses/noVNC-LICENSE.MPL-2.0.txt", "ThirdPartySources/TrollVNC-v3.2-272-source.tar.gz", "FPSDaemon/COPYING", "FPSDaemon/HIDBridge.h", "FPSDaemon/CursorHosting-NOTICE.txt", "ThirdPartySources/iControl-FPSDaemon-1.4.0-source.tar.gz"] {
                     guard FileManager.default.fileExists(atPath: root.appendingPathComponent(file).path) else { throw ControlError("缺少资源：\(file)") }
                 }
                 for package in [ServerPackage.rootless, .rootful] { _ = try package.verifiedData(in: root.appendingPathComponent("ServerPackages")) }

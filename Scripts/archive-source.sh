@@ -8,7 +8,7 @@ ICONTROL_EXPORT="$(mktemp -d "$ICONTROL_ROOT/work/source-export.XXXXXX")"
 trap 'rm -rf "$ICONTROL_EXPORT"' EXIT
 ICONTROL_SOURCE="$ICONTROL_EXPORT/iControl"
 mkdir -p "$ICONTROL_SOURCE"
-for ICONTROL_ITEM in .gitignore Package.swift README.md LICENSE THIRD_PARTY_NOTICES.md Device Resources Scripts Sources Tests Tools; do
+for ICONTROL_ITEM in .gitignore .github Package.swift README.md README.zh-CN.md docs LICENSE THIRD_PARTY_NOTICES.md Device Resources Scripts Sources Tests Tools; do
   ditto --norsrc "$ICONTROL_ROOT/$ICONTROL_ITEM" "$ICONTROL_SOURCE/$ICONTROL_ITEM"
 done
 find "$ICONTROL_SOURCE" -type f -name .DS_Store -delete
