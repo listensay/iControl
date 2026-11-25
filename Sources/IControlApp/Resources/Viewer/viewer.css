@@ -1,0 +1,40 @@
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #111822; color: #a8b5c6; font: 14px -apple-system, BlinkMacSystemFont, sans-serif; }
+#screen { position: absolute; inset: 0; }
+#screen:focus { outline: none; }
+#notice { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 18px; align-items: center; justify-content: center; background: #111822; pointer-events: none; }
+.pulse { width: 28px; height: 28px; border: 2px solid #253345; border-top-color: #62a8ff; border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+canvas { outline: none; }
+#fps-overlay { position: fixed; display: none; z-index: 2; box-sizing: border-box; pointer-events: none; }
+#fps-overlay:focus { outline: none; }
+#fps-overlay.editing { user-select: none; -webkit-user-select: none; touch-action: none; background: #2089ff04; outline: 1px solid #70b9ff66; }
+#fps-overlay.calibrating { cursor: crosshair; border: 2px solid #70b9ff; background: rgba(44,113,207,0.06); }
+.fps-marker { position: absolute; z-index: 2; transform: translate(-50%, -50%); width: 36px; height: 36px; padding: 3px; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: white; background: rgba(11,22,38,.65); border: 1px solid rgba(130,199,255,.8); font-size: 10px; box-sizing: border-box; white-space: nowrap; box-shadow: 0 2px 10px #0006; }
+.fps-marker-key { max-width: 100%; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.fps-marker::before { content: ''; position: absolute; inset: calc(0px - var(--grip-offset, 0px)); border-radius: inherit; }
+.fps-marker.joystick { border: 2px solid #84ccff; padding: 0; }
+.fps-marker.look { border-radius: 6px; width: auto; min-width: 72px; padding: 0 8px; }
+.fps-marker.selected { border-color: #ffc568; color: #ffe2a8; box-shadow: 0 0 0 5px #ffba462a; }
+.fps-marker.disabled { opacity: .4; border-style: dashed; }
+.editing .fps-marker, .editing .fps-look-zone { cursor: grab; }
+.editing .fps-marker:hover { border-color: #fff; background: #16345ddd; }
+.editing .fps-marker.selected { z-index: 4; opacity: 1; }
+.dragging .fps-marker.selected, .dragging .fps-look-zone.selected { cursor: grabbing; }
+.fps-marker-caption { display: none; position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%); padding: 4px 7px; border-radius: 5px; background: #11243aed; color: #e8f3ff; font-size: 10px; font-weight: 500; pointer-events: none; }
+.editing .fps-marker.selected .fps-marker-caption, .editing .fps-marker:hover .fps-marker-caption { display: block; }
+.fps-look-zone { position: absolute; z-index: 1; border: 1px dashed #73b7ff99; background: #2089ff0a; border-radius: 12px; box-sizing: border-box; }
+.editing .fps-look-zone.selected { border: 2px solid #ffc568; background: #ffba4609; }
+.fps-resize-handle { display: none; position: absolute; z-index: 6; width: 12px; height: 12px; border: 2px solid #172c43; border-radius: 3px; background: #ffd082; box-shadow: 0 0 0 1px #ffd082; box-sizing: border-box; }
+.selected > .fps-resize-handle { display: block; }
+.fps-resize-handle::after { content: ''; position: absolute; inset: -6px; }
+.fps-resize-handle.nw { left: calc(0px - var(--grip-offset, 0px)); top: calc(0px - var(--grip-offset, 0px)); transform: translate(-50%, -50%); cursor: nwse-resize; }
+.fps-resize-handle.ne { right: calc(0px - var(--grip-offset, 0px)); top: calc(0px - var(--grip-offset, 0px)); transform: translate(50%, -50%); cursor: nesw-resize; }
+.fps-resize-handle.sw { left: calc(0px - var(--grip-offset, 0px)); bottom: calc(0px - var(--grip-offset, 0px)); transform: translate(-50%, 50%); cursor: nesw-resize; }
+.fps-resize-handle.se { right: calc(0px - var(--grip-offset, 0px)); bottom: calc(0px - var(--grip-offset, 0px)); transform: translate(50%, 50%); cursor: nwse-resize; }
+.fps-guide { position: absolute; z-index: 0; pointer-events: none; opacity: .45; }
+.fps-guide.x { top: 0; bottom: 0; border-left: 1px dashed #ffd082; }
+.fps-guide.y { left: 0; right: 0; border-top: 1px dashed #ffd082; }
+#fps-hint { position: absolute; z-index: 5; display: none; left: 50%; top: 10px; max-width: calc(100% - 48px); transform: translateX(-50%); padding: 7px 12px; border-radius: 16px; color: #e4efff; background: #101e30d9; border: 1px solid #91b7e633; font-size: 11px; white-space: nowrap; pointer-events: none; }
+.fps-swipe-path { position: absolute; z-index: 1; height: 0; border-top: 2px dashed #ffd082; transform-origin: 0 0; pointer-events: none; }
+.fps-swipe-path::after { content: ''; position: absolute; right: 0; top: -5px; width: 8px; height: 8px; border-right: 2px solid #ffd082; border-top: 2px solid #ffd082; transform: rotate(45deg); }
+.fps-marker.swipe-end { border-color: #ffd082; background: #483517bb; }

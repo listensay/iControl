@@ -1,0 +1,2 @@
+6e19c0e3df87ba1e83e6ebf2208c3480ce7defb858c2835ac50cef611d385028  com.82flex.trollvnc_3.2-272_iphoneos-arm.deb
+eff873a15d6b5a2afb287111f04a8a89532cb4bf7acbf63b5e3160c8a27753df  com.82flex.trollvnc_3.2-272_iphoneos-arm64.deb
