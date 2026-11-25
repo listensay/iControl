@@ -8,7 +8,7 @@ A native macOS app with an integrated iPad display, editable touch mappings, and
 
 [Download for Mac](https://github.com/listensay/icontrol/releases) · [Prerequisites & setup guide](docs/SETUP.md) · [中文准备与使用教程](docs/SETUP.zh-CN.md)
 
-Mac **1.4.5 (13)** · Apple Silicon · macOS 14+ · iPad FPS daemon **1.4.0**
+Mac **1.4.6 (14)** · Apple Silicon · macOS 14+ · iPad FPS daemon **1.4.0**
 
 ## In the game
 
@@ -27,7 +27,7 @@ The layout editor on a real game screen. This screenshot was supplied by the use
 
 ## Interface
 
-The game toolbar gives **Edit layout (拖拽布局)** a filled blue button and **Show cursor (呼出鼠标)** an outlined blue button. The cursor label reflects its active state; unavailable actions remain gray.
+The game toolbar gives **Edit layout (拖拽布局)** a filled blue button and **Show cursor (呼出鼠标)** an outlined blue button. Both controls have matching dimensions in the toolbar and sidebar, including when the cursor label changes to its active state. Unavailable actions remain gray.
 
 ![Highlighted layout and cursor controls](docs/images/game-controls.png)
 
@@ -74,7 +74,8 @@ Display and FPS input travel through separate connections. The VNC viewer handle
 
 - **Device targets:** the Mac package targets Apple Silicon and macOS 14+. The FPS daemon targets arm64 iOS 14+ and requires a compatible jailbreak. Actual compatibility depends on the device and jailbreak environment; setup requirements are in the [guide](docs/SETUP.md).
 - **Video:** the installer requests 65% display scale and 60 FPS by default. These are requested settings, not a measured frame rate or latency guarantee.
-- **Input lifecycle:** actions own distinct touch contacts. Linked hold actions retain a shared target until all owners release it; tap and swipe actions complete their own gesture. A configurable WASD reset can lift and re-center only the movement contact after leaving a diagonal.
+- **Input lifecycle:** actions own distinct touch contacts. Linked hold actions retain a shared target until all owners release it; tap and swipe actions complete their own gesture. WASD retains one movement contact while steering and lifts on the next input tick after all movement keys are released.
+- **WASD wheel:** inspired by [QtScrcpy’s steering wheel](https://github.com/barry-ran/QtScrcpy/blob/dev/docs/KeyMapDes_zh.md). Diagonals retain both full axis offsets; adding or releasing a direction replaces the current straight-line trajectory at a constant travel speed. The default is 25 ms per full axis offset (50 ms for a full reversal), with continuous touch through direction changes. The most recent opposing key takes priority.
 - **Release behavior:** ending capture, deactivating the app, disconnecting, or exiting releases touches. The device watchdog releases contacts after 350 ms without valid input.
 - **Credentials:** SSH credentials are used for the installation operation. Saved VNC passwords and FPS credentials are scoped to a device in the Mac Keychain. Classic VNC uses eight password characters; installation generates a separate control password.
 - **Packaging:** the viewer, device packages, FPS daemon, required third-party sources and licenses, and both documentation languages are included in the Mac app. The package is ad-hoc signed; Developer ID signing and notarization are not configured.

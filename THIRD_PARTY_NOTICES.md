@@ -43,6 +43,13 @@ eff873a15d6b5a2afb287111f04a8a89532cb4bf7acbf63b5e3160c8a27753df  com.82flex.tro
 - The UIKit plugin initialization and accessibility window-hosting API sequence in `Device/FPSDaemon/DeviceCursor.m` follow that project's HUD implementation. No input fetching code is incorporated. The passive cursor renderer runs as an isolated child of the FPS daemon.
 - The full MIT notice is preserved in `Device/FPSDaemon/CursorHosting-NOTICE.txt` and the bundled `Resources/FPSDaemon/CursorHosting-NOTICE.txt`.
 
+## QtScrcpy steering-wheel reference
+
+- Project: https://github.com/barry-ran/QtScrcpy
+- Reference implementation: https://github.com/barry-ran/QtScrcpyCore/blob/9e388b8aa48e4e1c2cfdef408ef00c4c6b45c921/src/device/controller/inputconvert/inputconvertgame.cpp
+- Upstream license: Apache-2.0.
+- iControl independently implements the continuous-touch, independent-axis offset and straight-line travel behavior in Swift. No QtScrcpy source or binary is bundled. Travel uses deterministic elapsed time rather than randomized points or timer delays; opposing keys retain iControl’s most-recent-key priority.
+
 ## Build tools
 
 - The optional iPad build toolchain is downloaded into `work/toolchain/` and excluded from the distributed source archive.

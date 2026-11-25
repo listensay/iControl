@@ -142,15 +142,13 @@ public struct FPSProfile: Codable, Equatable, Identifiable, Sendable {
     public var name = "通用 FPS"
     public var joystick = FPSPoint(x: 0.15, y: 0.76)
     public var joystickEnabled = true
-    /// Short circular transition between keyboard directions, in seconds.
-    /// Reversals and stopping do not interpolate. Releasing an axis can
-    /// re-establish the game joystick origin, independently of this duration.
+    /// Time for one full axis offset, in seconds. Steering travels in a straight
+    /// line from the current position to the latest target, including releases.
+    /// A full reversal takes twice this time; stopping lifts without animation.
     public var keyboardTurnDuration = 0.025
-    /// Re-establish the game's touch origin when diagonal movement returns to
-    /// one axis. Some floating joysticks retain a displaced origin on moves.
-    public var keyboardRecenterOnAxisRelease = true
     public var cursorToggleKey = "Backquote"
-    /// Radius in fractions of display height; X is adjusted for the aspect ratio.
+    /// Each axis' travel in fractions of display height; X is aspect adjusted.
+    /// Diagonals use both full offsets, rather than reducing either axis.
     public var joystickRadius = 0.085
     public var look = FPSPoint(x: 0.66, y: 0.43)
     public var lookEnabled = true
@@ -185,7 +183,7 @@ public struct FPSProfile: Codable, Equatable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, id, name, joystick, joystickRadius, look, lookWidth, lookHeight, joystickEnabled, lookEnabled
-        case keyboardTurnDuration, keyboardRecenterOnAxisRelease, cursorToggleKey, keyLinks
+        case keyboardTurnDuration, cursorToggleKey, keyLinks
         case sensitivity, swapMouseAxes, invertX, invertY, touchMapping, wheelSwitchWeapons, orientation, bindings, customButtons
     }
     public init(from decoder: Decoder) throws {
@@ -196,7 +194,8 @@ public struct FPSProfile: Codable, Equatable, Identifiable, Sendable {
         joystick = try values.decode(FPSPoint.self, forKey: .joystick)
         joystickEnabled = try values.decodeIfPresent(Bool.self, forKey: .joystickEnabled) ?? true
         keyboardTurnDuration = try values.decodeIfPresent(Double.self, forKey: .keyboardTurnDuration) ?? 0.025
-        keyboardRecenterOnAxisRelease = try values.decodeIfPresent(Bool.self, forKey: .keyboardRecenterOnAxisRelease) ?? true
+        // Legacy keyboardRecenterOnAxisRelease is intentionally ignored: saved
+        // layouts also use continuous steering, without up/down gaps on turns.
         cursorToggleKey = try values.decodeIfPresent(String.self, forKey: .cursorToggleKey) ?? "Backquote"
         joystickRadius = try values.decode(Double.self, forKey: .joystickRadius)
         look = try values.decode(FPSPoint.self, forKey: .look)

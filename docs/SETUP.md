@@ -59,14 +59,16 @@ The app does not synchronize the iPad clipboard to the Mac.
 2. Turn on **FPS 游戏模式**, select a profile, and open **拖拽布局…** (Edit layout).
 3. Drag WASD onto the game joystick center. Position the mouse look region over the area the game uses for turning the camera.
 4. Drag each action onto the corresponding game button. Resize with corner handles. For a swipe action, place both its start and end markers.
-5. Use the layout sidebar to change sizes, mouse axes, movement radius, swipe timing, or coordinate calibration. Select the screen orientation if the video and daemon report different directions.
+5. Use the layout sidebar to change sizes, mouse axes, movement travel distance, swipe timing, or coordinate calibration. Select the screen orientation if the video and daemon report different directions.
 6. Use the test actions while it is appropriate to generate touches in the game, then click **保存布局** (Save layout).
 
 ![Layout editor on the game screen](images/in-game-layout.png)
 
 Layout shortcuts: **⌘Z** undo, **⇧⌘Z** redo, **⌘S** save, arrow keys move one pixel, Shift + arrow keys move ten pixels, and + / − resize. **取消** (Cancel) restores the configuration from before editing. A disconnection preserves the layout draft.
 
-The WASD sidebar includes **斜走松键时重置摇杆中心** (Reset joystick center after leaving a diagonal) and movement transition settings. When enabled, releasing A while holding W+A resets only the movement touch at the configured center and pushes it forward again. This usually takes about 33–50 ms; other touch contacts remain active. Aligning the movement center with the game's joystick is essential.
+The WASD sidebar uses a continuous wheel inspired by QtScrcpy. W+A pushes both axes by their full configured distance. Releasing A slides horizontally back to W without lifting or changing the forward offset. **WASD 推杆过渡** (WASD travel time) defaults to 25 ms for one full axis offset; a complete reversal takes 50 ms. Set it to 0 ms for immediate positioning. A new direction replaces any unfinished movement, and releasing all keys lifts on the next input tick (normally within 8 ms).
+
+Align the movement center with the game's joystick and adjust **推杆距离** (Travel distance) in the layout inspector until straight and diagonal walking reach the desired speed. Diagonal travel keeps both full offsets, so it reaches farther from the center than straight travel. For predictable steering, use the game's fixed joystick option where available. Existing profiles retain their positions, distances, key mappings and travel time; the old diagonal reset option is no longer used.
 
 ## Manage buttons and links
 
@@ -145,8 +147,8 @@ To publish a version:
 3. Tag that commit with the matching version, for example:
 
    ```sh
-   git tag v1.4.5
-   git push origin v1.4.5
+   git tag v1.4.6
+   git push origin v1.4.6
    ```
 
 4. Actions verifies that the tag matches the app version, builds and validates the package, uploads the Mac ZIP and `SHA256SUMS.txt` to a draft release, then publishes it after both assets are uploaded. The publish job uses GitHub's built-in token; no additional secret is required.

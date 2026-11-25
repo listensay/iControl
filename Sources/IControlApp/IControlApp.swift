@@ -3,8 +3,8 @@ import AppKit
 import IControlCore
 
 enum AppResources {
-    static let version = "1.4.5"
-    static var build: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "13" }
+    static let version = "1.4.6"
+    static var build: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "14" }
     static func openReadme() {
         NSWorkspace.shared.open(root.appendingPathComponent("README.md"))
     }

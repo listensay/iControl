@@ -174,7 +174,7 @@ export class FPSOverlay {
   updateHint() {
     if (this.drag) {
       const g = targetGeometry(this.profile, this.drag.target);
-      const size = g.radius !== undefined ? `半径 ${(g.radius * 100).toFixed(1)}%` : g.size !== undefined ? `大小 ${(g.size * 100).toFixed(1)}%` : `${(g.width * 100).toFixed(1)}% × ${(g.height * 100).toFixed(1)}%`;
+      const size = g.radius !== undefined ? `推杆距离 ${(g.radius * 100).toFixed(1)}%` : g.size !== undefined ? `大小 ${(g.size * 100).toFixed(1)}%` : `${(g.width * 100).toFixed(1)}% × ${(g.height * 100).toFixed(1)}%`;
       this.hint.textContent = `X ${(g.x * 100).toFixed(1)}% · Y ${(g.y * 100).toFixed(1)}% · ${size}`;
     } else {
       this.hint.textContent = this.editing ? '编辑布局 · 拖动移动 · 角点缩放 · 方向键微调' : this.profile.calibrating ? '标定模式 · 点击游戏中的目标位置' : this.captured ? this.cursor ? `鼠标已呼出 · 左键点击 / 拖动 · ${this.cursorKey} 恢复转向` : `FPS 输入已捕获 · ${this.cursorKey} 呼出鼠标 · F8 释放` : 'FPS 模式 · 点击画面或按 F8 捕获鼠标';

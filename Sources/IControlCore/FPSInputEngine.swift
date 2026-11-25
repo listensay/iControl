@@ -96,11 +96,10 @@ public struct FPSInputEngine: Sendable {
         guard !released.isEmpty else { return [] }
         if released.contains(where: { FPSKey.movement.contains($0) }) {
             movementKeys.removeAll { released.contains($0) }
-            if movementKeys.isEmpty { keyboardJoystick.releasedAllKeys() }
         }
-        // Coalesce a release and the next direction within one input tick.
-        // This prevents a center snapshot between a quick A -> D handoff.
-        if released.isSubset(of: FPSKey.movement) { return [] }
+        // Only coalesce an all-up handoff within one input tick (at most 8 ms).
+        // Partial releases retarget immediately and retain the same touch.
+        if released.isSubset(of: FPSKey.movement), movementKeys.isEmpty { return [] }
         return advance(now: now)
     }
     public mutating func setCursorMode(_ enabled: Bool, now: TimeInterval) -> [FPSState] {
@@ -162,8 +161,7 @@ public struct FPSInputEngine: Sendable {
         swipes = swipes.filter { $0.value.liftedAfter.map { now < $0 } ?? true }
         var contacts: [FPSContact] = []
         if profile.joystickEnabled,
-           let direction = keyboardJoystick.point(keys: movementKeys, now: now, turnDuration: profile.keyboardTurnDuration,
-                                                  recenterOnAxisRelease: profile.keyboardRecenterOnAxisRelease) {
+           let direction = keyboardJoystick.point(keys: movementKeys, now: now, turnDuration: profile.keyboardTurnDuration) {
             var point = profile.joystick
             point.x += direction.x * profile.joystickRadius / aspect
             point.y += direction.y * profile.joystickRadius

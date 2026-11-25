@@ -33,7 +33,7 @@ struct FPSLayoutInspector: View {
                 Divider()
                 if editor.selection == "joystick" {
                     FPSJoystickControls(profile: draftBinding)
-                    dimension("摇杆半径", value: layoutValue(\.joystickRadius) {
+                    dimension("推杆距离", value: layoutValue(\.joystickRadius) {
                         controller.layoutGeometry(target: "joystick", radius: $0)
                     }, range: FPSProfile.joystickRadiusRange)
                     Button("测试 WASD 换向", action: controller.testLayoutMovement)

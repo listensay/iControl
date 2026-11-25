@@ -140,7 +140,7 @@ struct FPSSettingsView: View {
             Text("WASD 移动").font(.system(size: 14, weight: .semibold))
             Toggle("启用 WASD 移动映射", isOn: $draft.joystickEnabled).toggleStyle(.checkbox)
             if draft.joystickEnabled { Button("删除移动映射", role: .destructive) { draft.removeMapping("joystick") } }
-            Text("WASD 控制移动，鼠标控制视角。换向过渡与松键归位选项在拖拽布局中选中 WASD 后调整。")
+            Text("WASD 连续控制轮盘，鼠标控制视角。在拖拽布局中选中 WASD，可调整推杆距离与过渡时间。")
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }.font(.system(size: 11))
     }
