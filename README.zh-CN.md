@@ -8,7 +8,7 @@
 
 [下载 Mac 版](https://github.com/listensay/icontrol/releases) · [前提准备与使用教程](docs/SETUP.zh-CN.md) · [English setup guide](docs/SETUP.md)
 
-Mac **1.4.7（15）** · Apple Silicon · macOS 14+ · iPad FPS 控制端 **1.4.0**
+Mac **1.4.8（16）** · Apple Silicon · macOS 14+ · iPad FPS 控制端 **1.4.0**
 
 ## 游戏内画面
 
@@ -75,7 +75,7 @@ flowchart LR
 - **目标环境：** Mac 包面向 Apple Silicon 与 macOS 14+。FPS 控制端面向 arm64 iOS 14+，需要兼容的越狱环境。实际兼容性取决于设备与越狱方式，前提准备见[教程](docs/SETUP.zh-CN.md)。
 - **画面参数：** 安装默认请求 65% 分辨率和 60 FPS，这是请求配置，不代表实测帧率或延迟保证。
 - **输入生命周期：** 动作使用独立触点。联动按住型动作在所有触发来源松开后释放；点按与滑动各自完成手势。WASD 在连续走位时保持同一个移动触点，全部松开后在下一输入帧抬起。
-- **WASD 轮盘：** 独立 Swift 实现，连续触点参考 [QtScrcpy 方向盘映射](https://github.com/barry-ran/QtScrcpy/blob/dev/docs/KeyMapDes_zh.md)。八个方向使用相同的圆形推杆半径；松开某轴立即清除该轴偏移，避免只按 W 时还残留横向过渡。其他位移保持直线过渡，默认一个半径 25 ms，完全反向 50 ms。相反方向优先响应后按的键。中心十字和单独 W 直行测试用于核对游戏摇杆中心。
+- **WASD 轮盘：** 独立 Swift 实现，连续触点参考 [QtScrcpy 方向盘映射](https://github.com/barry-ran/QtScrcpy/blob/dev/docs/KeyMapDes_zh.md)。八个方向使用相同的圆形推杆半径；8.3 ms 内相邻的松键会合并，期间保持最后触点位置；斜走两键一起松开时直接抬指，只松一键则在窗口结束后清除该轴偏移，避免残留横向过渡。其他位移保持直线过渡，默认一个半径 25 ms，完全反向 50 ms。相反方向优先响应后按的键。中心十字和单独 W 直行测试用于核对游戏摇杆中心。
 - **释放机制：** 结束捕获、切换应用、断线和退出都会释放触点。设备端超过 350 ms 未收到有效输入时自动释放。
 - **凭据：** SSH 密码用于本次安装；保存的 VNC 密码与 FPS 凭据按设备存入 Mac 钥匙串。经典 VNC 使用前八位密码，安装时生成独立控制密码。
 - **应用打包：** 内置画面客户端、设备安装包、FPS 控制端、所需第三方源码与许可证，以及中英文文档。当前采用临时签名，尚未配置 Developer ID 签名与公证。

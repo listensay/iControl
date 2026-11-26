@@ -27,6 +27,88 @@ final class FPSKeyboardMovementTests {
     }
     private let diagonal = 1 / sqrt(2.0)
 
+    func testPairedDiagonalReleasesLiftAtLastPointWithoutIntermediateDirection() throws {
+        let daemon = try NativeFPSFixture(interfaceOrientation: 3), socket = try daemon.connect()
+        defer { socket.close(); daemon.stop() }
+        var sequence: UInt32 = 0
+        for duration in [0.0, 0.025, 0.060] {
+            for pair in [["KeyW", "KeyA"], ["KeyW", "KeyD"], ["KeyS", "KeyA"], ["KeyS", "KeyD"]] {
+                for keys in [pair, Array(pair.reversed())] {
+                    for gap in [0.0, 0.002, 0.007] {
+                        for releaseAt in [0.008, 0.025, 0.3] {
+                            var profile = FPSProfile(); profile.keyboardTurnDuration = duration
+                            profile.touchMapping.rotation = 1
+                            var engine = try FPSInputEngine(profile: profile); _ = engine.start()
+                            func send(_ frames: [FPSState]) throws {
+                                for frame in frames { sequence += 1; _ = try daemon.send(frame, sequence: sequence, socket: socket) }
+                            }
+                            try send(engine.keyDown(keys[0], now: 0))
+                            try send(engine.keyDown(keys[1], now: 0.001))
+                            try send(engine.keyDown("MouseLeft", now: 0.002))
+                            try send(engine.advance(now: releaseAt))
+                            let position = try XCTUnwrap(engine.state.contacts.first { $0.id == 1 }?.point)
+                            let firstFrame = daemon.frames.count
+                            try send(engine.keyUp(keys[0], now: releaseAt))
+                            // Timer, look and button events can land between the two key-up events.
+                            try send(engine.advance(now: releaseAt + gap / 3))
+                            engine.mouseMoved(dx: 2, dy: 1, now: releaseAt + gap / 2)
+                            try send(engine.keyDown("MouseRight", now: releaseAt + gap / 2))
+                            try send(engine.keyUp("MouseLeft", now: releaseAt + gap * 0.75))
+                            XCTAssertEqual(engine.state.contacts.first { $0.id == 1 }?.point, position)
+                            try send(engine.keyUp(keys[1], now: releaseAt + gap))
+                            try send(engine.advance(now: releaseAt + gap + 1.0 / 120))
+                            let edges = daemon.frames.dropFirst(firstFrame).compactMap { $0.edges[1] }
+                            XCTAssertEqual(edges.map(\.kind), ["up"], "Together means lift, never briefly steer along the leftover key")
+                            let up = try XCTUnwrap(edges.last)
+                            near(up.x, 1 - position.y, tolerance: 0.00003)
+                            near(up.y, position.x, tolerance: 0.00003)
+                            XCTAssertTrue(engine.state.contacts.contains { $0.id == FPSAction.aim.touchID })
+                            XCTAssertFalse(engine.state.contacts.contains { $0.id == FPSAction.fire.touchID })
+                            try send([engine.releaseAll()])
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    func testPendingReleaseHonorsDeadlineRepressAndCaptureReset() throws {
+        var profile = FPSProfile(); profile.keyboardTurnDuration = 0
+        var engine = try FPSInputEngine(profile: profile); _ = engine.start()
+        _ = engine.keyDown("KeyW", now: 0); _ = engine.keyDown("KeyA", now: 0)
+        _ = engine.advance(now: 0.1)
+        let held = try direction(engine, profile: profile)
+        _ = engine.keyUp("KeyA", now: 0.2)
+        // A repeated held key and an unrelated action cannot extend the window.
+        _ = engine.keyDown("KeyW", now: 0.204)
+        _ = engine.keyDown("MouseLeft", now: 0.208)
+        near(try direction(engine, profile: profile), held)
+        let deadline = 0.2 + FPSInputEngine.movementReleaseInterval
+        _ = engine.advance(now: deadline)
+        near(try direction(engine, profile: profile), .init(x: 0, y: -1))
+        XCTAssertTrue(engine.state.contacts.contains { $0.id == FPSAction.fire.touchID })
+        _ = engine.keyUp("KeyW", now: deadline + 0.001)
+        _ = engine.advance(now: deadline + 0.002)
+        XCTAssertEqual(engine.state.contacts.map(\.id), [FPSAction.fire.touchID])
+
+        // Re-pressing before the deadline cancels the pending single-axis turn.
+        _ = engine.keyDown("KeyW", now: 1); _ = engine.keyDown("KeyA", now: 1)
+        _ = engine.advance(now: 1.1)
+        _ = engine.keyUp("KeyA", now: 1.2)
+        _ = engine.keyDown("KeyA", now: 1.204)
+        _ = engine.advance(now: 1.3)
+        near(try direction(engine, profile: profile), held)
+        _ = engine.keyUp("KeyA", now: 1.4)
+        XCTAssertTrue(engine.releaseAll().contacts.isEmpty)
+        XCTAssertTrue(engine.advance(now: 2).isEmpty)
+        _ = engine.start()
+        _ = engine.keyDown("KeyD", now: 3)
+        XCTAssertEqual(engine.state.contacts.first { $0.id == 1 }?.point, profile.joystick)
+        _ = engine.advance(now: 3.1)
+        near(try direction(engine, profile: profile), .init(x: 1, y: 0))
+        XCTAssertEqual(engine.state.contacts.map(\.id), [1])
+    }
+
     func testDiagonalTrajectoriesStayInsideTheDisplayedJoystickCircle() throws {
         // A floating joystick that follows a finger outside its travel radius
         // must never have its origin displaced by iControl's own trajectory.
@@ -55,7 +137,7 @@ final class FPSKeyboardMovementTests {
         }
     }
 
-    func testForwardAfterDiagonalReleaseHasNoLateralOffsetOnTheKeyEdge() throws {
+    func testForwardAfterDiagonalReleaseClearsLateralOffsetAfterCoalescing() throws {
         let daemon = try NativeFPSFixture(interfaceOrientation: 3), socket = try daemon.connect()
         defer { socket.close(); daemon.stop() }
         var sequence: UInt32 = 0
@@ -79,7 +161,12 @@ final class FPSKeyboardMovementTests {
                     try send(engine.keyDown(side, now: 0.2))
                     try send(engine.advance(now: releaseAt))
                     let firstFrame = daemon.frames.count
+                    let held = try direction(engine, profile: profile)
                     try send(engine.keyUp(side, now: releaseAt))
+                    near(try direction(engine, profile: profile), held)
+                    try send(engine.advance(now: releaseAt + 0.008))
+                    near(try direction(engine, profile: profile), held)
+                    try send(engine.advance(now: releaseAt + FPSInputEngine.movementReleaseInterval))
                     near(try direction(engine, profile: profile).x, 0)
                     for tick in 1...24 {
                         try send(engine.advance(now: releaseAt + Double(tick) / 120))
@@ -168,7 +255,7 @@ final class FPSKeyboardMovementTests {
                     let aim = try XCTUnwrap(engine.state.contacts.first { $0.id == FPSAction.aim.touchID })
                     try send(engine.keyUp(releaseHorizontal ? horizontal : vertical, now: 1.001))
                     let released = try direction(engine, profile: profile, aspect: aspect)
-                    near(releaseHorizontal ? released.x : released.y, 0)
+                    near(released, .init(x: x * diagonal, y: y * diagonal))
                     var intermediate = false
                     for tick in 1...24 {
                         let now = 1.001 + Double(tick) / 120
@@ -227,11 +314,16 @@ final class FPSKeyboardMovementTests {
                 XCTAssertTrue(hypot(vector.x, vector.y) <= 1.00001)
             }
             _ = engine.keyUp("KeyD", now: 0.4)
-            near(try direction(engine, profile: profile).x, 0)
+            near(try direction(engine, profile: profile), .init(x: diagonal, y: -diagonal))
             for tick in 1...Int(rate * 0.1) {
                 let elapsed = Double(tick) / rate
                 _ = engine.advance(now: 0.4 + elapsed)
-                near(try direction(engine, profile: profile), .init(x: 0, y: -min(1, diagonal + elapsed / 0.060)))
+                if elapsed < FPSInputEngine.movementReleaseInterval {
+                    near(try direction(engine, profile: profile), .init(x: diagonal, y: -diagonal))
+                } else {
+                    let travelTime = elapsed - FPSInputEngine.movementReleaseInterval
+                    near(try direction(engine, profile: profile), .init(x: 0, y: -min(1, diagonal + travelTime / 0.060)))
+                }
             }
         }
     }
@@ -244,17 +336,17 @@ final class FPSKeyboardMovementTests {
         let initialY = -1 + (1 - diagonal) * 0.3 / diagonal
         near(try direction(engine, profile: profile), .init(x: -0.3, y: initialY))
         _ = engine.keyUp("KeyA", now: 0.218)
-        near(try direction(engine, profile: profile), .init(x: 0, y: initialY))
-        _ = engine.keyDown("KeyD", now: 0.218)
-        near(try direction(engine, profile: profile), .init(x: 0, y: initialY))
-        _ = engine.advance(now: 0.248)
-        let secondY = initialY + (-diagonal - initialY) * 0.5 / diagonal
-        near(try direction(engine, profile: profile), .init(x: 0.5, y: secondY))
-        _ = engine.keyDown("KeyA", now: 0.248)
+        near(try direction(engine, profile: profile), .init(x: -0.3, y: initialY))
+        _ = engine.keyDown("KeyD", now: 0.220)
+        near(try direction(engine, profile: profile), .init(x: -0.3, y: initialY))
+        _ = engine.advance(now: 0.250)
+        let secondY = initialY + (-diagonal - initialY) * 0.5 / (diagonal + 0.3)
+        near(try direction(engine, profile: profile), .init(x: 0.2, y: secondY))
+        _ = engine.keyDown("KeyA", now: 0.250)
         for tick in 1...12 {
-            _ = engine.advance(now: 0.248 + Double(tick) / 120)
+            _ = engine.advance(now: 0.250 + Double(tick) / 120)
             let vector = try direction(engine, profile: profile)
-            XCTAssertTrue(vector.x <= 0.5 + 0.00001 && vector.x >= -diagonal - 0.00001)
+            XCTAssertTrue(vector.x <= 0.2 + 0.00001 && vector.x >= -diagonal - 0.00001)
             XCTAssertTrue(hypot(vector.x, vector.y) <= 1.00001)
         }
         near(try direction(engine, profile: profile), .init(x: -diagonal, y: -diagonal))
@@ -335,6 +427,8 @@ final class FPSKeyboardMovementTests {
             near(try direction(engine, profile: profile), .init(x: -initial.x, y: -initial.y))
             XCTAssertTrue(engine.keyDown(first, now: 0.03).isEmpty, "Repeat cannot steal direction priority")
             _ = engine.keyUp(opposite, now: 0.04)
+            near(try direction(engine, profile: profile), .init(x: -initial.x, y: -initial.y))
+            _ = engine.advance(now: 0.04 + FPSInputEngine.movementReleaseInterval)
             near(try direction(engine, profile: profile), initial)
             XCTAssertEqual(engine.state.contacts.map(\.id), [1])
         }
@@ -389,11 +483,17 @@ final class FPSKeyboardMovementTests {
         _ = engine.keyDown("KeyW", now: 0); _ = engine.advance(now: 0.1)
         _ = engine.keyDown("KeyD", now: 0.2); _ = engine.advance(now: 0.212)
         near(try direction(engine, profile: profile), .init(x: 0.2, y: -1 + (1 - diagonal) * 0.2 / diagonal))
+        let held = try direction(engine, profile: profile)
         _ = engine.keyUp("KeyD", now: 0.212)
-        near(try direction(engine, profile: profile).x, 0)
+        near(try direction(engine, profile: profile), held)
         _ = engine.advance(now: 0.218)
+        near(try direction(engine, profile: profile), held)
+        let deadline = 0.212 + FPSInputEngine.movementReleaseInterval
+        _ = engine.advance(now: deadline)
+        near(try direction(engine, profile: profile), .init(x: 0, y: held.y))
+        _ = engine.advance(now: deadline + 0.006)
         near(try direction(engine, profile: profile), .init(x: 0, y: -1))
-        _ = engine.advance(now: 0.225)
+        _ = engine.advance(now: deadline + 0.013)
         near(try direction(engine, profile: profile), .init(x: 0, y: -1))
         XCTAssertTrue(engine.advance(now: 0.3).isEmpty)
     }

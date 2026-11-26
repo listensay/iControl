@@ -18,6 +18,12 @@ struct FPSKeyboardJoystick: Sendable {
     }
     private var travel: Travel?
 
+    mutating func holdPosition() {
+        // Coalescing releases freezes the last output, including unfinished
+        // travel. A later direction starts here without advancing the old path.
+        target = current; travel = nil
+    }
+
     mutating func point(keys: [String], now: TimeInterval, turnDuration: Double) -> FPSPoint? {
         let horizontal = keys.last { $0 == "KeyA" || $0 == "KeyD" }
         let vertical = keys.last { $0 == "KeyW" || $0 == "KeyS" }
@@ -44,8 +50,8 @@ struct FPSKeyboardJoystick: Sendable {
         } else {
             updateTravel(now: now)
             if next != target {
-                // A released axis must stop on the key edge. Continuing to
-                // interpolate its old offset makes W alone still steer sideways.
+                // Once coalesced releases are applied, clear a released axis.
+                // Interpolating its old offset would keep steering sideways.
                 // Correct only that axis; keep the touch and remaining travel.
                 if next.x == 0 { current.x = 0 }
                 if next.y == 0 { current.y = 0 }

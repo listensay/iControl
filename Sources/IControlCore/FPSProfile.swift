@@ -143,8 +143,8 @@ public struct FPSProfile: Codable, Equatable, Identifiable, Sendable {
     public var joystick = FPSPoint(x: 0.15, y: 0.76)
     public var joystickEnabled = true
     /// Time for one full axis offset, in seconds. Steering travels in a straight
-    /// line from the current position to the latest target. Releasing an axis
-    /// clears that axis immediately while the remaining travel completes.
+    /// line from the current position to the latest target. After the short
+    /// release-coalescing window, a released axis clears without interpolation.
     /// A full reversal takes twice this time; stopping lifts without animation.
     public var keyboardTurnDuration = 0.025
     public var cursorToggleKey = "Backquote"

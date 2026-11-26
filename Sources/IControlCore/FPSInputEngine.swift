@@ -37,6 +37,12 @@ public struct FPSInputEngine: Sendable {
     private var lastMouse: TimeInterval = 0
     private var movementKeys: [String] = []
     private var keyboardJoystick = FPSKeyboardJoystick()
+    private var movementDirection: FPSPoint?
+    private var movementReleaseDeadline: TimeInterval?
+    // macOS delivers separate key-up events even when two keys are released
+    // together. Hold the last sent position for one input interval so a stop
+    // cannot briefly become a cardinal direction before the second key-up.
+    static let movementReleaseInterval = 1.0 / 120.0
 
     public init(profile: FPSProfile) throws { try profile.validate(); self.profile = profile; buttons = profile.buttons }
     public mutating func setAspect(_ value: Double) {
@@ -51,6 +57,7 @@ public struct FPSInputEngine: Sendable {
         pressed.removeAll(); taps.removeAll(); swipes.removeAll(); pendingX = 0; pendingY = 0
         physicalKeys.removeAll(); keySources.removeAll()
         lookPosition = nil; movementKeys.removeAll(); keyboardJoystick = FPSKeyboardJoystick()
+        movementDirection = nil; movementReleaseDeadline = nil
         buttonIdentifiers.removeAll()
         state = FPSState(orientation: profile.orientation); return state
     }
@@ -65,7 +72,9 @@ public struct FPSInputEngine: Sendable {
             keySources[key, default: []].insert(code)
             if pressed.insert(key).inserted { activated.insert(key) }
         }
-        if FPSKey.movement.contains(code), activated.contains(code) { movementKeys.append(code) }
+        if FPSKey.movement.contains(code), activated.contains(code) {
+            movementKeys.append(code); movementReleaseDeadline = nil
+        }
         let bindings = buttons.filter { $0.enabled && activated.contains($0.trigger) && $0.behavior == .tap }
         var frames: [FPSState] = []
         if linked.contains(FPSKey.cursorAction) { frames += setCursorMode(!cursorMode, now: now) }
@@ -96,9 +105,14 @@ public struct FPSInputEngine: Sendable {
         guard !released.isEmpty else { return [] }
         if released.contains(where: { FPSKey.movement.contains($0) }) {
             movementKeys.removeAll { released.contains($0) }
+            if movementKeys.isEmpty { movementReleaseDeadline = nil }
+            else if movementReleaseDeadline == nil {
+                keyboardJoystick.holdPosition()
+                movementReleaseDeadline = now + Self.movementReleaseInterval
+            }
         }
-        // Only coalesce an all-up handoff within one input tick (at most 8 ms).
-        // Partial releases retarget immediately and retain the same touch.
+        // Retain the existing all-up handoff until the next input tick. Partial
+        // releases also wait one interval, including across unrelated events.
         if released.isSubset(of: FPSKey.movement), movementKeys.isEmpty { return [] }
         return advance(now: now)
     }
@@ -160,8 +174,16 @@ public struct FPSInputEngine: Sendable {
         taps = taps.filter { $0.value > now }
         swipes = swipes.filter { $0.value.liftedAfter.map { now < $0 } ?? true }
         var contacts: [FPSContact] = []
-        if profile.joystickEnabled,
-           let direction = keyboardJoystick.point(keys: movementKeys, now: now, turnDuration: profile.keyboardTurnDuration) {
+        if movementReleaseDeadline.map({ now >= $0 }) ?? true {
+            if let deadline = movementReleaseDeadline {
+                // Start the remaining direction at the deadline, so its travel
+                // time does not depend on when the next timer tick arrives.
+                _ = keyboardJoystick.point(keys: movementKeys, now: deadline, turnDuration: profile.keyboardTurnDuration)
+            }
+            movementReleaseDeadline = nil
+            movementDirection = keyboardJoystick.point(keys: movementKeys, now: now, turnDuration: profile.keyboardTurnDuration)
+        }
+        if profile.joystickEnabled, let direction = movementDirection {
             var point = profile.joystick
             point.x += direction.x * profile.joystickRadius / aspect
             point.y += direction.y * profile.joystickRadius
