@@ -15,9 +15,9 @@ The following independent packages and libraries keep their respective licenses.
 Package SHA256:
 
 ```text
-eff873a15d6b5a2afb287111f04a8a89532cb4bf7acbf63b5e3160c8a27753df  com.82flex.trollvnc_3.2-272_iphoneos-arm64.deb·
+eff873a15d6b5a2afb287111f04a8a89532cb4bf7acbf63b5e3160c8a27753df  com.82flex.trollvnc_3.2-272_iphoneos-arm64.deb
 6e19c0e3df87ba1e83e6ebf2208c3480ce7defb858c2835ac50cef611d385028  com.82flex.trollvnc_3.2-272_iphoneos-arm.deb
-```·
+```
 
 ## noVNC
 
@@ -42,13 +42,6 @@ eff873a15d6b5a2afb287111f04a8a89532cb4bf7acbf63b5e3160c8a27753df  com.82flex.tro
 - License: MIT, Copyright (c) 2023 Lessica.
 - The UIKit plugin initialization and accessibility window-hosting API sequence in `Device/FPSDaemon/DeviceCursor.m` follow that project's HUD implementation. No input fetching code is incorporated. The passive cursor renderer runs as an isolated child of the FPS daemon.
 - The full MIT notice is preserved in `Device/FPSDaemon/CursorHosting-NOTICE.txt` and the bundled `Resources/FPSDaemon/CursorHosting-NOTICE.txt`.
-
-## QtScrcpy steering-wheel reference
-
-- Project: https://github.com/barry-ran/QtScrcpy
-- Reference implementation: https://github.com/barry-ran/QtScrcpyCore/blob/9e388b8aa48e4e1c2cfdef408ef00c4c6b45c921/src/device/controller/inputconvert/inputconvertgame.cpp
-- Upstream license: Apache-2.0.
-- iControl independently implements a Swift wheel inspired by QtScrcpy's continuous-touch lifecycle and straight-line travel. No QtScrcpy source or binary is bundled. iControl constrains diagonal targets to the displayed circular radius and immediately clears a released axis to avoid residual sideways travel. It uses deterministic elapsed time rather than randomized points or timer delays, and opposing keys retain iControl’s most-recent-key priority.
 
 ## Build tools
 

@@ -66,9 +66,9 @@ The app does not synchronize the iPad clipboard to the Mac.
 
 Layout shortcuts: **⌘Z** undo, **⇧⌘Z** redo, **⌘S** save, arrow keys move one pixel, Shift + arrow keys move ten pixels, and + / − resize. **取消** (Cancel) restores the configuration from before editing. A disconnection preserves the layout draft.
 
-The WASD sidebar uses an independently implemented continuous wheel inspired by QtScrcpy. Straight and diagonal targets remain inside the same circle. Releases within 8.3 ms are coalesced while holding the last touch position. Releasing both diagonal keys lifts without briefly steering along the remaining key; releasing only A/D clears the horizontal offset after that window while retaining the movement touch, so W alone points directly forward. **WASD 推杆过渡** (WASD travel time) defaults to 25 ms per radius; a complete reversal takes 50 ms. Set it to 0 ms for immediate positioning. A new direction replaces any unfinished movement, and releasing all keys lifts on the next input tick (normally within 8.3 ms).
+**平滑换向** (Smooth steering) is on by default. When a direction key changes, both axes move together from the current position and slow as they reach the new direction over about 100 ms. W+A reaches the same diagonal whether you press W or A first. Releasing just A steers back to W with the same finger. Releasing both keys within one input interval (8.3 ms) lifts without an intermediate turn. To use the previous linear or instant response, turn off smooth steering and set **WASD 推杆过渡** (travel time per radius); 0 ms is instant. Older profiles with a custom travel time keep their manual timing.
 
-Align the center crosshair with the game's joystick center while no direction is held. Adjust **推杆距离** (Travel distance) within the game's actual joystick travel radius; excessive travel can move a floating joystick's origin. **测试直行 W** (Test W forward) sends W alone for about one second without mouse look, while **测试八向** (Test eight directions) exercises diagonal transitions. If the W-only test drifts, check the center alignment and the game's fixed joystick setting. Existing profiles retain their positions, distances, key mappings and travel time; the old diagonal reset option is no longer used.
+Align the crosshair with the game's resting joystick center. Keep **推杆距离** (Travel distance) within the game's joystick radius. Use **测试直行 W** to check forward without mouse input. **测试 W+A 加鼠标转向** turns the camera as it enters the same diagonal from A and from W. Watch the game's joystick: it should point to the same upper-left position on both passes, and straight up when only W is held.
 
 ## Manage buttons and links
 
@@ -113,7 +113,7 @@ The cursor displayed on the iPad requires FPS daemon 1.4.0. Upgrade older servic
 | Video does not connect | Restore the jailbreak after reboot; check that TrollVNC is installed and the control password is correct |
 | Video works, FPS input does not | Check FPS daemon installation and credentials; inspect **诊断与日志** (Diagnostics & logs) |
 | Actions touch the wrong location | Fix orientation, align markers with game controls, and use coordinate calibration in the layout sidebar |
-| Movement drifts after a diagonal | Align the joystick center; check the reset option and movement transition settings |
+| Diagonal movement drifts while turning the camera | In 1.4.9 or later, align the wheel with the game’s joystick, enable smooth steering, and run the W+A camera-turn test in the layout editor |
 | Cursor does not appear on the iPad | Upgrade the daemon to 1.4.0; check the cursor status message |
 | Need a backup viewer | Open **系统屏幕共享** (System Screen Sharing) after USB forwarding is connected |
 
@@ -147,8 +147,8 @@ To publish a version:
 3. Tag that commit with the matching version, for example:
 
    ```sh
-   git tag v1.4.8
-   git push origin v1.4.8
+   git tag v1.4.9
+   git push origin v1.4.9
    ```
 
 4. Actions verifies that the tag matches the app version, builds and validates the package, uploads the Mac ZIP and `SHA256SUMS.txt` to a draft release, then publishes it after both assets are uploaded. The publish job uses GitHub's built-in token; no additional secret is required.

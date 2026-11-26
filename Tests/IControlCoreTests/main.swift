@@ -34,6 +34,8 @@ let checks: [(String, () throws -> Void)] = [
     ("WASD circular travel / no floating-origin displacement", fpsKeyboard.testDiagonalTrajectoriesStayInsideTheDisplayedJoystickCircle),
     ("WASD forward after diagonal / coalesced zero lateral offset / native retained touch", fpsKeyboard.testForwardAfterDiagonalReleaseClearsLateralOffsetAfterCoalescing),
     ("WASD forward preview / one vertical native touch / no mouse input / final release", fpsKeyboard.testForwardPreviewKeepsOneVerticalNativeTouchWithoutMouseInput),
+    ("W+A held while mouse look reanchors / stationary movement contact", fpsKeyboard.testDiagonalWithLookPreviewKeepsMovementFixedAcrossLookReanchors),
+    ("WASD smooth two-axis turns / deceleration across tick rates / interrupted travel", fpsKeyboard.testSmoothSteeringDeceleratesBothAxesAndReplacesUnfinishedTravel),
     ("WASD center dwell / smooth initial travel / rapid edges", fpsKeyboard.testCenterDownSurvivesRapidEdgesAndInitialTravelIsSmooth),
     ("WASD all diagonal releases / continuous native touch / retained fire aim look / mapped origins", fpsKeyboard.testAllDiagonalReleasesKeepOneNativeTouchAndOtherFingers),
     ("WASD circular targets / linear add / coalesced axis release / tick rates", fpsKeyboard.testCircularTargetsAndLinearTravelAcrossTickRates),

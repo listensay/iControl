@@ -47,6 +47,29 @@ extension FPSProfile {
 public enum FPSInputPreview {
     public static let interval = 1.0 / 60.0
 
+    /// Approach W+A from each neighboring direction while the camera turns.
+    public static func diagonalWithLook(profile: FPSProfile, aspect: Double) throws -> [FPSState] {
+        guard profile.joystickEnabled, profile.lookEnabled else {
+            throw ControlError("请先启用 WASD 移动和鼠标转向映射")
+        }
+        var engine = try FPSInputEngine(profile: profile)
+        engine.setAspect(aspect); _ = engine.start()
+        var frames = [engine.state]
+        for tick in 1...600 {
+            let now = Double(tick) * interval
+            switch tick {
+            case 20, 330: _ = engine.keyDown("KeyA", now: now)
+            case 34: _ = engine.keyDown("KeyW", now: now)
+            case 210, 480: _ = engine.keyUp("KeyA", now: now)
+            default: break
+            }
+            engine.mouseMoved(dx: tick % 120 < 60 ? 16 : -16, dy: 0, now: now)
+            _ = engine.advance(now: now); frames.append(engine.state)
+        }
+        frames.append(engine.releaseAll())
+        return frames
+    }
+
     public static func action(_ action: FPSAction, profile: FPSProfile) throws -> [FPSState] {
         try button(action.id, profile: profile)
     }

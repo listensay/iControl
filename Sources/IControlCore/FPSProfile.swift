@@ -142,10 +142,9 @@ public struct FPSProfile: Codable, Equatable, Identifiable, Sendable {
     public var name = "通用 FPS"
     public var joystick = FPSPoint(x: 0.15, y: 0.76)
     public var joystickEnabled = true
-    /// Time for one full axis offset, in seconds. Steering travels in a straight
-    /// line from the current position to the latest target. After the short
-    /// release-coalescing window, a released axis clears without interpolation.
-    /// A full reversal takes twice this time; stopping lifts without animation.
+    /// Ease the entire movement vector into the new direction, including on a partial key release.
+    public var smoothKeyboardSteering = true
+    /// Manual mode only: seconds per radius, with immediate correction of a released axis.
     public var keyboardTurnDuration = 0.025
     public var cursorToggleKey = "Backquote"
     /// Circular travel radius in fractions of display height; X is aspect
@@ -184,7 +183,7 @@ public struct FPSProfile: Codable, Equatable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, id, name, joystick, joystickRadius, look, lookWidth, lookHeight, joystickEnabled, lookEnabled
-        case keyboardTurnDuration, cursorToggleKey, keyLinks
+        case keyboardTurnDuration, smoothKeyboardSteering, cursorToggleKey, keyLinks
         case sensitivity, swapMouseAxes, invertX, invertY, touchMapping, wheelSwitchWeapons, orientation, bindings, customButtons
     }
     public init(from decoder: Decoder) throws {
@@ -195,6 +194,8 @@ public struct FPSProfile: Codable, Equatable, Identifiable, Sendable {
         joystick = try values.decode(FPSPoint.self, forKey: .joystick)
         joystickEnabled = try values.decodeIfPresent(Bool.self, forKey: .joystickEnabled) ?? true
         keyboardTurnDuration = try values.decodeIfPresent(Double.self, forKey: .keyboardTurnDuration) ?? 0.025
+        // Keep explicitly tuned legacy timings, including instant steering.
+        smoothKeyboardSteering = try values.decodeIfPresent(Bool.self, forKey: .smoothKeyboardSteering) ?? (keyboardTurnDuration == 0.025)
         // Legacy keyboardRecenterOnAxisRelease is intentionally ignored: saved
         // layouts also use continuous steering, without up/down gaps on turns.
         cursorToggleKey = try values.decodeIfPresent(String.self, forKey: .cursorToggleKey) ?? "Backquote"

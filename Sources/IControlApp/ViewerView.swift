@@ -88,7 +88,7 @@ struct ViewerView: NSViewRepresentable {
             guard ready, let fps = model?.fpsController,
                   let json = try? fps.viewerJSON() else { return }
             let enabled = fps.enabled ? "true" : "false"
-            let markers = fps.showMarkers && !fps.captured ? "true" : "false"
+            let markers = fps.showMarkers && !fps.captured && !fps.layoutTesting ? "true" : "false"
             let captured = fps.captured ? "true" : "false"
             let cursor = fps.cursorMode ? "true" : "false"
             let key = FPSKey.title(fps.profile.cursorToggleKey)

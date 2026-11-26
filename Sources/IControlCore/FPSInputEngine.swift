@@ -178,10 +178,10 @@ public struct FPSInputEngine: Sendable {
             if let deadline = movementReleaseDeadline {
                 // Start the remaining direction at the deadline, so its travel
                 // time does not depend on when the next timer tick arrives.
-                _ = keyboardJoystick.point(keys: movementKeys, now: deadline, turnDuration: profile.keyboardTurnDuration)
+                _ = keyboardJoystick.point(keys: movementKeys, now: deadline, turnDuration: profile.keyboardTurnDuration, smooth: profile.smoothKeyboardSteering)
             }
             movementReleaseDeadline = nil
-            movementDirection = keyboardJoystick.point(keys: movementKeys, now: now, turnDuration: profile.keyboardTurnDuration)
+            movementDirection = keyboardJoystick.point(keys: movementKeys, now: now, turnDuration: profile.keyboardTurnDuration, smooth: profile.smoothKeyboardSteering)
         }
         if profile.joystickEnabled, let direction = movementDirection {
             var point = profile.joystick

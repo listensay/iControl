@@ -11,7 +11,7 @@ final class FPSEngineTests: TestCase {
     }
 
     func testJoystickAnchoringDiagonalAndOppositeKeys() throws {
-        var profile = FPSProfile(); profile.keyboardTurnDuration = 0
+        var profile = FPSProfile(); profile.smoothKeyboardSteering = false; profile.keyboardTurnDuration = 0
         var engine = try FPSInputEngine(profile: profile); engine.setAspect(4.0 / 3.0)
         _ = engine.start()
         _ = engine.keyDown("KeyW", now: 1)

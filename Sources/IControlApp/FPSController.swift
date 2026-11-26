@@ -348,7 +348,7 @@ final class FPSController: ObservableObject {
     }
 
     func viewerJSON() throws -> String {
-        try (layoutEditor?.draft ?? profile).viewerJSON(calibrating: calibration, editing: isEditingLayout,
+        try (layoutEditor?.draft ?? profile).viewerJSON(calibrating: calibration, editing: isEditingLayout && !layoutTesting,
             selection: layoutEditor?.selection, session: layoutSession, sequence: layoutSequence)
     }
     func beginLayoutEditing(_ target: String = "joystick") {
@@ -540,12 +540,20 @@ final class FPSController: ObservableObject {
             runLayoutTest(try FPSInputPreview.forward(profile: editor.draft, aspect: aspect), title: "W 直行（无鼠标转向）")
         } catch { layoutError = error.localizedDescription }
     }
+    func testLayoutDiagonalWithLook() {
+        guard let editor = layoutEditor else { return }
+        do {
+            runLayoutTest(try FPSInputPreview.diagonalWithLook(profile: editor.draft, aspect: aspect),
+                          title: "W+A 加鼠标转向")
+        } catch { layoutError = error.localizedDescription }
+    }
     private func runLayoutTest(_ frames: [FPSState], title: String) {
         guard isEditingLayout, !captured, !layoutSaving, videoReady, ready, let currentLink = link else {
             layoutError = "连接 iPad 画面和 FPS 输入通道后才能测试"; return
         }
         stopLayoutTest()
         layoutError = nil; layoutTesting = true; layoutTestMessage = "正在测试：\(title)"
+        visualsChanged?()
         let testEpoch = UUID(); layoutTestEpoch = testEpoch
         layoutTestTask = Task { [weak self] in
             do {
@@ -558,6 +566,7 @@ final class FPSController: ObservableObject {
             } catch { return }
             guard let self, layoutTestEpoch == testEpoch else { return }
             currentLink.releaseAll(); layoutTesting = false; layoutTestTask = nil
+            visualsChanged?()
             layoutTestMessage = "\(title)测试已发送，请观察 iPad 的实际响应。"
         }
     }
@@ -565,6 +574,7 @@ final class FPSController: ObservableObject {
         guard layoutTestTask != nil else { return }
         layoutTestEpoch = UUID(); layoutTestTask?.cancel(); layoutTestTask = nil
         layoutTesting = false; link?.releaseAll()
+        visualsChanged?()
     }
     private func profileChanged() {
         releaseCapture()

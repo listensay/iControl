@@ -8,7 +8,7 @@ A native macOS app with an integrated iPad display, editable touch mappings, and
 
 [Download for Mac](https://github.com/listensay/icontrol/releases) · [Prerequisites & setup guide](docs/SETUP.md) · [中文准备与使用教程](docs/SETUP.zh-CN.md)
 
-Mac **1.4.8 (16)** · Apple Silicon · macOS 14+ · iPad FPS daemon **1.4.0**
+Mac **1.4.9 (17)** · Apple Silicon · macOS 14+ · iPad FPS daemon **1.4.0**
 
 ## In the game
 
@@ -75,7 +75,7 @@ Display and FPS input travel through separate connections. The VNC viewer handle
 - **Device targets:** the Mac package targets Apple Silicon and macOS 14+. The FPS daemon targets arm64 iOS 14+ and requires a compatible jailbreak. Actual compatibility depends on the device and jailbreak environment; setup requirements are in the [guide](docs/SETUP.md).
 - **Video:** the installer requests 65% display scale and 60 FPS by default. These are requested settings, not a measured frame rate or latency guarantee.
 - **Input lifecycle:** actions own distinct touch contacts. Linked hold actions retain a shared target until all owners release it; tap and swipe actions complete their own gesture. WASD retains one movement contact while steering and lifts on the next input tick after all movement keys are released.
-- **WASD wheel:** independently implemented in Swift, with continuous touch inspired by [QtScrcpy’s steering wheel](https://github.com/barry-ran/QtScrcpy/blob/dev/docs/KeyMapDes_zh.md). All eight targets use the same circular travel radius. Releases arriving within 8.3 ms are coalesced at the last touch position: releasing both diagonal keys lifts without a brief turn; releasing only one clears that axis after the window, without a sideways transition. Other travel remains linear, with a default of 25 ms per radius (50 ms for a full reversal). The most recent opposing key takes priority. A center crosshair and a W-only test help check game joystick alignment.
+- **WASD wheel:** movement uses one continuous touch. By default, adding or releasing a direction key steers from the current position and slows as it reaches the new target. All eight directions use the same radius. Releasing both diagonal keys together lifts the touch. The layout editor can test entering W+A from either A or W while the camera turns.
 - **Release behavior:** ending capture, deactivating the app, disconnecting, or exiting releases touches. The device watchdog releases contacts after 350 ms without valid input.
 - **Credentials:** SSH credentials are used for the installation operation. Saved VNC passwords and FPS credentials are scoped to a device in the Mac Keychain. Classic VNC uses eight password characters; installation generates a separate control password.
 - **Packaging:** the viewer, device packages, FPS daemon, required third-party sources and licenses, and both documentation languages are included in the Mac app. The package is ad-hoc signed; Developer ID signing and notarization are not configured.

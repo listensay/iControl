@@ -40,6 +40,10 @@ struct FPSLayoutInspector: View {
                         Button("测试直行 W", action: controller.testLayoutForward)
                         Button("测试八向", action: controller.testLayoutMovement)
                     }.disabled(!controller.ready || controller.layoutTesting)
+                    Button("测试 W+A 加鼠标转向（10 秒）", action: controller.testLayoutDiagonalWithLook)
+                        .disabled(!controller.ready || controller.layoutTesting)
+                    Text("组合测试持续转动视角：先从 A 切到 W+A，再松开、按回 A。两次斜走时，游戏摇杆应指向同一个左上方向；只按 W 时应朝正上。")
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     Text("直行测试只发送 W 约 1 秒，八向测试约 1.5 秒。若直行仍偏，将中心十字对准游戏静止时的摇杆中心后再测。")
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 } else if editor.selection == "look" {

@@ -7,6 +7,7 @@ import Foundation
 struct FPSKeyboardJoystick: Sendable {
     // A center down must survive one display frame before the initial drag.
     static let anchorInterval = 1.0 / 60.0
+    static let settlingInterval = 0.100
     private var anchorTime: TimeInterval?
     private var hasDragged = false
     private var current = FPSPoint(x: 0, y: 0)
@@ -15,6 +16,7 @@ struct FPSKeyboardJoystick: Sendable {
         var started: TimeInterval
         var duration: TimeInterval
         var from: FPSPoint
+        var smooth: Bool
     }
     private var travel: Travel?
 
@@ -24,7 +26,7 @@ struct FPSKeyboardJoystick: Sendable {
         target = current; travel = nil
     }
 
-    mutating func point(keys: [String], now: TimeInterval, turnDuration: Double) -> FPSPoint? {
+    mutating func point(keys: [String], now: TimeInterval, turnDuration: Double, smooth: Bool) -> FPSPoint? {
         let horizontal = keys.last { $0 == "KeyA" || $0 == "KeyD" }
         let vertical = keys.last { $0 == "KeyW" || $0 == "KeyS" }
         guard horizontal != nil || vertical != nil else {
@@ -46,33 +48,29 @@ struct FPSKeyboardJoystick: Sendable {
         }
         if !hasDragged {
             hasDragged = true
-            beginTravel(to: next, now: anchorTime! + Self.anchorInterval, duration: turnDuration)
+            beginTravel(to: next, now: anchorTime! + Self.anchorInterval, duration: turnDuration, smooth: smooth)
         } else {
             updateTravel(now: now)
             if next != target {
-                // Once coalesced releases are applied, clear a released axis.
-                // Interpolating its old offset would keep steering sideways.
-                // Correct only that axis; keep the touch and remaining travel.
-                if next.x == 0 { current.x = 0 }
-                if next.y == 0 { current.y = 0 }
-                // Replace the old trajectory, starting at its current position.
-                // Never queue obsolete directions or lift on an axis release.
-                beginTravel(to: next, now: now, duration: turnDuration)
+                if !smooth {
+                    if next.x == 0 { current.x = 0 }
+                    if next.y == 0 { current.y = 0 }
+                }
+                beginTravel(to: next, now: now, duration: turnDuration, smooth: smooth)
             }
         }
         updateTravel(now: now)
         return current
     }
 
-    private mutating func beginTravel(to next: FPSPoint, now: TimeInterval, duration: Double) {
+    private mutating func beginTravel(to next: FPSPoint, now: TimeInterval, duration: Double, smooth: Bool) {
         let distance = max(abs(next.x - current.x), abs(next.y - current.y))
         target = next
-        if duration == 0 || distance == 0 {
+        let travelTime = smooth ? Self.settlingInterval : duration * distance
+        if travelTime == 0 || distance == 0 {
             current = next; travel = nil
         } else {
-            // Constant travel speed: one axis' full offset takes the configured
-            // time, a full reversal takes twice that, short corrections less.
-            travel = Travel(started: now, duration: duration * distance, from: current)
+            travel = Travel(started: now, duration: travelTime, from: current, smooth: smooth)
         }
     }
 
@@ -81,8 +79,10 @@ struct FPSKeyboardJoystick: Sendable {
         let progress = min(1, max(0, (now - travel.started) / travel.duration))
         if progress == 1 { current = target; self.travel = nil }
         else {
-            current = .init(x: travel.from.x + (target.x - travel.from.x) * progress,
-                            y: travel.from.y + (target.y - travel.from.y) * progress)
+            let remaining = 1 - progress
+            let fraction = travel.smooth ? 1 - remaining * remaining * remaining : progress
+            current = .init(x: travel.from.x + (target.x - travel.from.x) * fraction,
+                            y: travel.from.y + (target.y - travel.from.y) * fraction)
         }
     }
 }

@@ -5,14 +5,20 @@ struct FPSJoystickControls: View {
     @Binding var profile: FPSProfile
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("WASD 推杆过渡")
-                Slider(value: $profile.keyboardTurnDuration, in: FPSProfile.keyboardTurnDurationRange)
-                    .accessibilityLabel("WASD 推杆过渡")
-                Text("\(Int((profile.keyboardTurnDuration * 1000).rounded())) ms").monospacedDigit()
+            Toggle("平滑换向", isOn: $profile.smoothKeyboardSteering).toggleStyle(.checkbox)
+            if profile.smoothKeyboardSteering {
+                Text("加按或松开一个方向键时，摇杆从当前位置转向新方向，到位前逐渐减速。全部松开即抬指。")
+            } else {
+                HStack {
+                    Text("WASD 推杆过渡")
+                    Slider(value: $profile.keyboardTurnDuration, in: FPSProfile.keyboardTurnDurationRange)
+                        .accessibilityLabel("WASD 推杆过渡")
+                    Text("\(Int((profile.keyboardTurnDuration * 1000).rounded())) ms").monospacedDigit()
+                }
+                Button("即时换向") { profile.keyboardTurnDuration = 0 }
+                Text("手动模式：松开的轴直接归零。过渡时间按一个半径计算，完全反向用时加倍。")
             }
-            Button("即时换向") { profile.keyboardTurnDuration = 0 }
-            Text("直走与斜走保持相同推杆半径，触点始终在圆圈内。斜走两键相邻松开会合并为直接抬指；只松开 A / D 时，约 8 ms 后清除横向偏移，只按 W 就沿正前方推杆，移动触点保持按住。上方时间为一个半径的过渡，完全反向需两倍时间；0 ms 即时响应。移动中心需对准游戏静止时的摇杆中心，推杆距离不能超过游戏摇杆的活动范围；建议使用固定摇杆模式。")
+            Text("请将中心十字对准游戏摇杆的静止中心，并将推杆距离设在游戏摇杆的活动范围内。")
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }.font(.system(size: 11))
     }
