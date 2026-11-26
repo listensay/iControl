@@ -8,7 +8,7 @@
 
 [下载 Mac 版](https://github.com/listensay/icontrol/releases) · [前提准备与使用教程](docs/SETUP.zh-CN.md) · [English setup guide](docs/SETUP.md)
 
-Mac **1.4.9（17）** · Apple Silicon · macOS 14+ · iPad FPS 控制端 **1.4.0**
+Mac **1.4.10（18）** · Apple Silicon · macOS 14+ · iPad FPS 控制端 **1.4.1**
 
 ## 游戏内画面
 

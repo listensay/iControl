@@ -85,6 +85,53 @@ final class FPSDeviceCursorTests {
         _ = Darwin.kill(daemon.process.processIdentifier, SIGCONT)
         XCTAssertTrue(daemon.waitUntil(1) { (try? self.cursorFields(daemon)["visible"]) == "0" })
     }
+    func testRendererRecoversStationaryPointerWithoutReleasingMovement() throws {
+        let daemon = try NativeFPSFixture(), socket = try daemon.connect()
+        defer { socket.close(); daemon.stop() }
+        _ = try daemon.send(held, sequence: 1, socket: socket)
+        let shown = FPSDeviceCursor(point: .init(x: 0.31, y: 0.67))
+        XCTAssertEqual(try send(shown, sequence: 2, to: socket)[3], 3)
+        let log = try String(contentsOf: daemon.output)
+        let line = try XCTUnwrap(log.split(separator: "\n").first { $0.hasPrefix("FPS_CURSOR_RENDERER pid=") })
+        let pid = try XCTUnwrap(Int32(line.split(separator: "=").last!))
+        XCTAssertEqual(Darwin.kill(pid, SIGKILL), 0)
+        var seq: UInt32 = 2, sawUnavailable = false, recovered = false
+        let deadline = ProcessInfo.processInfo.systemUptime + 5
+        repeat {
+            Thread.sleep(forTimeInterval: 0.05)
+            seq += 1
+            let ack = try daemon.heartbeat(socket, sequence: seq)
+            XCTAssertEqual(ack[1], 1)
+            if ack[3] == 0 { sawUnavailable = true }
+            if sawUnavailable && ack[3] == 3 { recovered = true; break }
+        } while ProcessInfo.processInfo.systemUptime < deadline
+        XCTAssertTrue(sawUnavailable)
+        XCTAssertTrue(recovered, "An unmoved pointer must reappear without a second show command")
+        XCTAssertEqual(daemon.frames.count, 1, "Recovery must not release or move the held finger")
+    }
+    func testHiddenRequestDuringRendererStallIsNotReplayedAsVisible() throws {
+        let daemon = try NativeFPSFixture(), socket = try daemon.connect()
+        defer { socket.close(); daemon.stop() }
+        _ = try daemon.send(held, sequence: 1, socket: socket)
+        let line = try XCTUnwrap(try String(contentsOf: daemon.output).split(separator: "\n").first { $0.hasPrefix("FPS_CURSOR_RENDERER pid=") })
+        let pid = try XCTUnwrap(Int32(line.split(separator: "=").last!))
+        XCTAssertEqual(Darwin.kill(pid, SIGSTOP), 0)
+        defer { _ = Darwin.kill(pid, SIGCONT) }
+        let cursor = FPSDeviceCursor(point: .init(x: 0.4, y: 0.6))
+        let start = ProcessInfo.processInfo.systemUptime
+        XCTAssertEqual(try send(cursor, sequence: 2, to: socket)[1], 1)
+        XCTAssertTrue(ProcessInfo.processInfo.systemUptime - start < 0.09, "Touch session must not wait for a stalled renderer")
+        XCTAssertEqual(try send(nil, sequence: 3, to: socket)[1], 1)
+        for seq in 4...33 {
+            Thread.sleep(forTimeInterval: 0.06)
+            let ack = try daemon.heartbeat(socket, sequence: UInt32(seq))
+            XCTAssertEqual(ack[1], 1)
+            if seq == 33 { XCTAssertEqual(ack[3], 0) }
+        }
+        let starts = try String(contentsOf: daemon.output).split(separator: "\n").filter { $0.hasPrefix("FPS_CURSOR_RENDERER pid=") }
+        XCTAssertEqual(starts.count, 1, "A canceled pointer must not respawn the failed renderer")
+        XCTAssertEqual(daemon.frames.count, 1)
+    }
     func testTouchOnlyDaemonKeepsMacClickModeWithoutCursorOpcode() throws {
         let observed = DispatchSemaphore(value: 0)
         let fixture = try LoopbackFixture { socket in

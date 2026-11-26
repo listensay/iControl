@@ -8,7 +8,7 @@ A native macOS app with an integrated iPad display, editable touch mappings, and
 
 [Download for Mac](https://github.com/listensay/icontrol/releases) · [Prerequisites & setup guide](docs/SETUP.md) · [中文准备与使用教程](docs/SETUP.zh-CN.md)
 
-Mac **1.4.9 (17)** · Apple Silicon · macOS 14+ · iPad FPS daemon **1.4.0**
+Mac **1.4.10 (18)** · Apple Silicon · macOS 14+ · iPad FPS daemon **1.4.1**
 
 ## In the game
 

@@ -30,8 +30,8 @@ eff873a15d6b5a2afb287111f04a8a89532cb4bf7acbf63b5e3160c8a27753df  com.82flex.tro
 
 ## iControl FPS daemon
 
-- Independent iPad executable: `Device/FPSDaemon`, version 1.4.0, contact protocol 1 with optional visual cursor messages, greeting revision 14.
-- License: GPL-2.0-only. The complete corresponding source, embedded metadata and entitlement file are distributed in `Resources/ThirdPartySources/iControl-FPSDaemon-1.4.0-source.tar.gz`; the full license text is in `Resources/FPSDaemon/COPYING`.
+- Independent iPad executable: `Device/FPSDaemon`, version 1.4.1, contact protocol 1 with optional visual cursor messages, greeting revision 14.
+- License: GPL-2.0-only. The complete corresponding source, embedded metadata and entitlement file are distributed in `Resources/ThirdPartySources/iControl-FPSDaemon-1.4.1-source.tar.gz`; the full license text is in `Resources/FPSDaemon/COPYING`.
 - HID event dispatch conventions follow TrollVNC's `STHIDEventGenerator.mm` from the source release listed above. The original TrollVNC source archive is also included.
 - Private HID ABI declarations are based on Apple IOKitSPI.h, Copyright (C) 2015 Apple Inc., under its two-clause BSD license. The complete notice and disclaimer are preserved in `Device/FPSDaemon/HIDBridge.h` and the bundled `Resources/FPSDaemon/HIDBridge.h`.
 - The daemon is installed as a separate root launch job and is not linked into the Mac executable or the TrollVNC binary. Its build script and signed arm64 binary manifest are included.

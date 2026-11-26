@@ -11,7 +11,12 @@ ICONTROL_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionStrin
 ICONTROL_ARCHIVE="$ICONTROL_DIST/iControl-$ICONTROL_VERSION-mac.zip"
 ICONTROL_PACKAGES="$ICONTROL_ROOT/Sources/IControlApp/Resources/ServerPackages"
 mkdir -p "$ICONTROL_DIST" "$ICONTROL_ROOT/work"
-"$ICONTROL_ROOT/Scripts/build-fps-daemon.sh"
+case "${1:-}" in
+  '') "$ICONTROL_ROOT/Scripts/build-fps-daemon.sh" ;;
+  --bundled-fps) ;; # Keep the signed device binary that was exercised on hardware.
+  *) printf 'Usage: %s [--bundled-fps]\n' "$0" >&2; exit 2 ;;
+esac
+python3 Tools/verify-fps-package.py
 (
   cd "$ICONTROL_PACKAGES"
   shasum -a 256 -c SHA256SUMS.txt

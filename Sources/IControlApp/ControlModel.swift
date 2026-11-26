@@ -67,6 +67,7 @@ final class ControlModel: ObservableObject {
     let fpsController: FPSController
     let mux: USBMux
     let isDemo: Bool
+    let fpsUpdaterOnly = CommandLine.arguments.contains("--update-fps") || Bundle.main.object(forInfoDictionaryKey: "IControlFPSUpdaterOnly") as? Bool == true
     private var monitor: Task<Void, Never>?
     private var attemptTask: Task<Void, Never>?
     private var forwarder: USBForwarder?
@@ -122,6 +123,7 @@ final class ControlModel: ObservableObject {
         guard selectedUDID != udid else { return }
         if wantsConnection { stopConnection() }
         selectedUDID = udid
+        if fpsUpdaterOnly { return }
         if !isDemo { UserDefaults.standard.set(udid, forKey: "lastDevice") }
         vncPassword = ""
         passwordLoadAttempted = false
@@ -149,6 +151,7 @@ final class ControlModel: ObservableObject {
         for device in devices where !device.productType.isEmpty { deviceCache["\(device.udid):\(device.deviceID)"] = device }
         if deviceCache.count > 32 { deviceCache = [:] }
         if selectedDevice == nil && !wantsConnection, let first = devices.first { select(first.udid) }
+        if fpsUpdaterOnly { return }
         if selectedDevice != nil { loadPasswordOnce() }
         fpsController.update(device: selectedDevice, videoReady: viewerConnected)
         let discovery = scan.error ?? usbTitle

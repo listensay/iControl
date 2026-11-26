@@ -49,8 +49,14 @@ jobs:
           python3 Tools/verify-docs.py
           python3 Tools/verify-release-workflow.py
       - name: Package Mac app
+        env:
+          REF_TYPE: ${{ github.ref_type }}
         run: |
-          ./Scripts/build-app.sh
+          if [ "$REF_TYPE" = tag ]; then
+            ./Scripts/build-app.sh --bundled-fps
+          else
+            ./Scripts/build-app.sh
+          fi
           swift run -Xswiftc -enable-testing iControlValidation \
             --check-native-askpass dist/iControl.app/Contents/MacOS/iControl
           cd dist

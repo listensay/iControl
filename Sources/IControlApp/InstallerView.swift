@@ -85,6 +85,27 @@ final class InstallerModel: ObservableObject {
         } catch { self.error = error.localizedDescription }
     }
 
+    func updateFPS() {
+        guard !busy, environment?.managedByIControl == true, environment?.canInstall == true, let device, let control else { return }
+        do {
+            let credentials = try credentials(), installer = control.makeInstaller()
+            let report: @Sendable (InstallationStep) -> Void = { [self] step in Task { @MainActor in self.progress(step) } }
+            busy = true; mutating = true; error = nil; success = nil
+            Task {
+                let result = await Task.detached(priority: .userInitiated) {
+                    Result { try installer.updateFPS(device: device, credentials: credentials, progress: report) }
+                }.value
+                busy = false; mutating = false; step = nil
+                switch result {
+                case .success:
+                    clearCredentials()
+                    success = "FPS 控制端已更新并启动。回到游戏，点“呼出鼠标”，检查 iPad 画面上的指针。"
+                case .failure(let failure): error = failure.localizedDescription
+                }
+            }
+        } catch { self.error = error.localizedDescription }
+    }
+
     func restore() {
         guard !busy, environment?.managedByIControl == true, let device, let control else { return }
         do {
@@ -120,18 +141,21 @@ struct InstallerView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var state: InstallerModel
     @State private var reveal = false
-    init(model: ControlModel, device: USBDevice?) { _state = StateObject(wrappedValue: InstallerModel(control: model, device: device)) }
+    let fpsOnly: Bool
+    init(model: ControlModel, device: USBDevice?, fpsOnly: Bool = false) {
+        self.fpsOnly = fpsOnly; _state = StateObject(wrappedValue: InstallerModel(control: model, device: device))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 13) {
                 Image(systemName: "shippingbox").font(.system(size: 30)).foregroundStyle(.blue)
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("安装 iPad 控制端").font(.title2.weight(.semibold))
+                    Text(fpsOnly ? "更新 iPad 游戏指针" : "安装 iPad 控制端").font(.title2.weight(.semibold))
                     Text(state.device?.name ?? "USB 数据连接尚未就绪").font(.system(size: 12)).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("完成") { dismiss() }.disabled(state.busy).keyboardShortcut(.cancelAction)
+                Button("完成") { if fpsOnly { NSApp.terminate(nil) } else { dismiss() } }.disabled(state.busy).keyboardShortcut(.cancelAction)
             }
             Divider()
             ScrollView {
@@ -139,7 +163,7 @@ struct InstallerView: View {
                     if state.device == nil {
                         message("请先取得 iPad 的 USB 数据连接：解锁 iPad、信任这台 Mac，并重新插入数据线。连接就绪后重新打开此页面。", color: .orange)
                     }
-                    Text("在已越狱的 iPad 上先安装 OpenSSH 和 PreferenceLoader。保持设备解锁和 USB 连接，再输入 iPad 的登录信息。")
+                    Text(fpsOnly ? "保持 iPad 解锁并连接 USB。检测环境后，点“仅更新 FPS 控制端”。现有键位、投屏和控制密码会保留。" : "在已越狱的 iPad 上先安装 OpenSSH 和 PreferenceLoader。保持设备解锁和 USB 连接，再输入 iPad 的登录信息。")
                         .font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(4)
                     Text("palera1n 通常使用 mobile 账户，密码为越狱引导时设置的密码；可在 palera1n 中修改 Sudo Password。")
                         .font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(3)
@@ -176,7 +200,7 @@ struct InstallerView: View {
                             ForEach(environment.requirements, id: \.self) { Text($0).font(.system(size: 11)).foregroundStyle(.orange) }
                         }.padding(15).background(Color.green.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
                     }
-                    VStack(alignment: .leading, spacing: 12) {
+                    if !fpsOnly { VStack(alignment: .leading, spacing: 12) {
                         Text("2  设置控制密码与画质").font(.system(size: 14, weight: .semibold))
                         HStack(alignment: .bottom, spacing: 12) {
                             field("控制密码 · 8 位") {
@@ -190,7 +214,7 @@ struct InstallerView: View {
                         }
                         Toggle("把控制凭据保存到 Mac 钥匙串", isOn: $state.savePassword).toggleStyle(.checkbox).font(.system(size: 11))
                         Toggle("安装 FPS 多点触摸控制端（含 iPad 游戏指针）", isOn: $state.installFPS).toggleStyle(.checkbox).font(.system(size: 11))
-                        Text("FPS 模式支持同时移动、转向和开火。1.4.0 控制端增加显示在 iPad 游戏画面上的鼠标指针；连接后可查看指针是否就绪。")
+                        Text("FPS 模式支持同时移动、转向和开火。1.4.1 控制端可在游戏指针进程退出后自动恢复；连接后可查看 iPad 指针状态。")
                             .font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(3)
                         HStack(spacing: 22) {
                             Picker("分辨率", selection: $state.scale) {
@@ -200,7 +224,8 @@ struct InstallerView: View {
                         }.font(.system(size: 11))
                         Text("控制端使用官方 TrollVNC \(ServerPackage.version)。安装前会校验安装包，按检测到的越狱模式选择版本，并备份原配置。")
                             .font(.system(size: 10)).foregroundStyle(.secondary).lineSpacing(3)
-                    }.disabled(state.busy)
+                    }.disabled(state.busy) }
+                    if fpsOnly, state.environment?.managedByIControl == false { message("这台设备没有 iControl 管理的控制端，无法单独更新。", color: .orange) }
                     if state.busy {
                         HStack(spacing: 12) {
                             ProgressView().controlSize(.small)
@@ -218,13 +243,18 @@ struct InstallerView: View {
             }
             Divider()
             HStack {
-                if state.environment?.managedByIControl == true {
+                if !fpsOnly && state.environment?.managedByIControl == true {
                     Button("恢复原配置") { state.restore() }.disabled(state.busy)
                         .help("恢复本次 iControl 配置前的 TrollVNC 设置")
                 }
                 Spacer()
-                Button(state.environment?.installedVersion.isEmpty == false ? "配置并连接" : "安装并连接") { state.install() }
+                if fpsOnly || state.environment?.managedByIControl == true {
+                    Button("仅更新 FPS 控制端") { state.updateFPS() }
+                        .disabled(state.busy || state.environment?.managedByIControl != true || state.environment?.canInstall != true)
+                }
+                if !fpsOnly { Button(state.environment?.installedVersion.isEmpty == false ? "配置并连接" : "安装并连接") { state.install() }
                     .buttonStyle(PrimaryActionButtonStyle()).disabled(state.busy || state.environment?.canInstall != true)
+                }
             }
         }
         .padding(26).frame(width: 700, height: 700)

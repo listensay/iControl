@@ -3,8 +3,8 @@ import AppKit
 import IControlCore
 
 enum AppResources {
-    static let version = "1.4.9"
-    static var build: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "17" }
+    static let version = "1.4.10"
+    static var build: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "18" }
     static func openReadme() {
         NSWorkspace.shared.open(root.appendingPathComponent("README.md"))
     }
@@ -35,7 +35,7 @@ enum CommandLineMode {
         if CommandLine.arguments.contains("--verify-resources") {
             do {
                 let root = AppResources.root
-                for file in ["README.md", "README.zh-CN.md", "docs/SETUP.md", "docs/SETUP.zh-CN.md", "Viewer/index.html", "Viewer/viewer.js", "Viewer/fps-overlay.js", "Viewer/novnc/core/rfb.js", "Licenses/noVNC-LICENSE.MPL-2.0.txt", "ThirdPartySources/TrollVNC-v3.2-272-source.tar.gz", "FPSDaemon/COPYING", "FPSDaemon/HIDBridge.h", "FPSDaemon/CursorHosting-NOTICE.txt", "ThirdPartySources/iControl-FPSDaemon-1.4.0-source.tar.gz"] {
+                for file in ["README.md", "README.zh-CN.md", "docs/SETUP.md", "docs/SETUP.zh-CN.md", "Viewer/index.html", "Viewer/viewer.js", "Viewer/fps-overlay.js", "Viewer/novnc/core/rfb.js", "Licenses/noVNC-LICENSE.MPL-2.0.txt", "ThirdPartySources/TrollVNC-v3.2-272-source.tar.gz", "FPSDaemon/COPYING", "FPSDaemon/HIDBridge.h", "FPSDaemon/CursorHosting-NOTICE.txt", "ThirdPartySources/iControl-FPSDaemon-1.4.1-source.tar.gz"] {
                     guard FileManager.default.fileExists(atPath: root.appendingPathComponent(file).path) else { throw ControlError("缺少资源：\(file)") }
                 }
                 for package in [ServerPackage.rootless, .rootful] { _ = try package.verifiedData(in: root.appendingPathComponent("ServerPackages")) }
@@ -58,7 +58,7 @@ enum CommandLineMode {
                         let socket = try mux.connect(deviceID: detail.deviceID, port: FPSWire.port)
                         defer { socket.close() }
                         let greeting = try socket.read(count: 8, timeout: 1000)
-                        item["fpsService"] = greeting == FPSWire.greeting ? "1.4.0，支持 iPad 指针"
+                        item["fpsService"] = greeting == FPSWire.greeting ? "1.4.x，支持 iPad 指针（显示状态请见游戏模式）"
                             : greeting == FPSWire.touchOnlyGreeting ? "1.3.0，iPad 指针需要升级至 1.4.0"
                             : greeting == FPSWire.legacyGreeting ? "旧版，需要升级至 1.4.0" : "未知控制端"
                     } catch { item["fpsService"] = error.localizedDescription }
@@ -85,8 +85,11 @@ struct IControlApplication: App {
 
     var body: some Scene {
         WindowGroup("iControl", id: "main") {
-            ContentView(model: model)
-                .onAppear { appDelegate.model = model; model.start() }
+            Group {
+                if model.fpsUpdaterOnly {
+                    InstallerView(model: model, device: model.selectedDevice, fpsOnly: true).id(model.selectedDevice?.udid)
+                } else { ContentView(model: model) }
+            }.onAppear { appDelegate.model = model; model.start() }
         }
         .defaultSize(width: 1050, height: 740)
         .windowStyle(.hiddenTitleBar)

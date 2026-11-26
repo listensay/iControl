@@ -45,9 +45,11 @@ private final class FakeRemote {
         printf 'launchctl %s\n' "$*" >> "$TEST_LOG"
         case "$1" in
           print)
-            case "$*" in *com.icontrol.fpsd*) [ "${TEST_FPS_WAS_RUNNING:-0}" = 1 ] ;; *) [ "${TEST_WAS_RUNNING:-0}" = 1 ] ;; esac ;;
+            case "$*" in *com.icontrol.fpsd*) [ "${TEST_FPS_WAS_RUNNING:-0}" = 1 ] && echo ' pid = 123' ;; *) [ "${TEST_WAS_RUNNING:-0}" = 1 ] ;; esac ;;
           bootstrap|load)
-            case "$*" in *com.icontrol.fpsd*) [ "${TEST_FPS_START_FAIL:-0}" != 1 ] ;; *) [ "${TEST_START_FAIL:-0}" != 1 ] ;; esac ;;
+            case "$*" in *com.icontrol.fpsd*)
+              if [ "${TEST_NEW_FPS_FAIL:-0}" = 1 ] && grep -q 'test FPS' "$TEST_PREFIX/usr/local/libexec/icontrol-fpsd"; then exit 1; fi
+              [ "${TEST_FPS_START_FAIL:-0}" != 1 ] ;; *) [ "${TEST_START_FAIL:-0}" != 1 ] ;; esac ;;
           *) exit 0 ;;
         esac
         """#)
@@ -96,7 +98,7 @@ private final class FakeRemote {
     var fpsToken: URL { state.appendingPathComponent("fps-token") }
     func addFPSPayload() throws {
         try Data(RemoteFPSScripts.functions.utf8).write(to: stage.appendingPathComponent("fps-functions.sh"))
-        let bytes = Data("test FPS daemon executable".utf8)
+        let bytes = Data("#!/bin/sh\necho 'test FPS daemon executable'\n".utf8)
         try bytes.write(to: stage.appendingPathComponent("icontrol-fpsd"))
         let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
         try Data(digest.utf8).write(to: stage.appendingPathComponent("fps-sha256"))
@@ -109,11 +111,21 @@ private final class FakeRemote {
             try Data(("original " + file.lastPathComponent).utf8).write(to: file)
         }
     }
-    func run(action: String = "install", options: [String: String] = [:]) throws -> ProcessResult {
+    func prepareManagedFPSUpdate() throws -> String {
+        try addFPSPayload(); try addExistingFPS()
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fpsBinary.path)
+        try Data("managed".utf8).write(to: state.appendingPathComponent("fps-managed-by-icontrol"))
+        // A standalone update does not upload a new job, token, or VNC configuration.
+        for file in ["FPSDaemon.plist", "fps-token", "Managed.plist", "server.deb"] {
+            try FileManager.default.removeItem(at: stage.appendingPathComponent(file))
+        }
+        return try String(contentsOf: stage.appendingPathComponent("fps-sha256"))
+    }
+    func run(action: String = "install", expectedHash: String? = nil, options: [String: String] = [:]) throws -> ProcessResult {
         var environment = ProcessInfo.processInfo.environment
         environment["TEST_PREFIX"] = prefix.path; environment["TEST_LOG"] = log.path
         environment.merge(options) { _, new in new }
-        return try ProcessRunner.run(executable: URL(fileURLWithPath: "/bin/sh"), arguments: [script.path, stage.path, "iphoneos-arm64", hash, action], environment: environment, timeout: 15)
+        return try ProcessRunner.run(executable: URL(fileURLWithPath: "/bin/sh"), arguments: [script.path, stage.path, "iphoneos-arm64", expectedHash ?? hash, action], environment: environment, timeout: 15)
     }
     func cleanup() { try? FileManager.default.removeItem(at: root) }
 }
@@ -228,5 +240,33 @@ final class InstallationScriptTests: TestCase {
         XCTAssertEqual(result.status, 44)
         XCTAssertEqual(try Data(contentsOf: remote.configuration), Data("original video".utf8))
         XCTAssertFalse(FileManager.default.fileExists(atPath: remote.fpsBinary.path))
+    }
+
+    func testStandaloneFPSUpdateKeepsOtherFilesAndServices() throws {
+        let remote = try FakeRemote(original: Data("video settings".utf8)); defer { remote.cleanup() }
+        let digest = try remote.prepareManagedFPSUpdate()
+        let untouched = [remote.configuration, remote.fpsToken, remote.fpsJob, remote.state.appendingPathComponent("fps-managed-by-icontrol")]
+        let previous = try untouched.map { try Data(contentsOf: $0) }
+        let result = try remote.run(action: "update-fps", expectedHash: digest, options: ["TEST_FPS_WAS_RUNNING": "1"])
+        XCTAssertEqual(result.status, 0, result.errorText)
+        XCTAssertTrue(result.outputText.contains("ICONTROL:DONE=fps-updated"))
+        XCTAssertEqual(try Data(contentsOf: remote.fpsBinary), try Data(contentsOf: remote.stage.appendingPathComponent("icontrol-fpsd")))
+        XCTAssertEqual(try untouched.map { try Data(contentsOf: $0) }, previous)
+        let actions = try String(contentsOf: remote.log)
+        XCTAssertFalse(actions.contains("com.82flex.trollvnc")); XCTAssertFalse(actions.contains("dpkg-install"))
+    }
+
+    func testStandaloneFPSUpdatePreflightAndRollback() throws {
+        let remote = try FakeRemote(original: Data("video settings".utf8)); defer { remote.cleanup() }
+        let digest = try remote.prepareManagedFPSUpdate()
+        let files = [remote.fpsBinary, remote.configuration, remote.fpsToken, remote.fpsJob]
+        let previous = try files.map { try Data(contentsOf: $0) }
+        XCTAssertEqual(try remote.run(action: "update-fps", expectedHash: digest).status, 46)
+        XCTAssertEqual(try remote.run(action: "update-fps", options: ["TEST_FPS_WAS_RUNNING": "1"]).status, 44)
+        XCTAssertFalse(try String(contentsOf: remote.log).contains("bootout"))
+        let result = try remote.run(action: "update-fps", expectedHash: digest, options: ["TEST_FPS_WAS_RUNNING": "1", "TEST_NEW_FPS_FAIL": "1"])
+        XCTAssertNotEqual(result.status, 0); XCTAssertTrue(result.errorText.contains("已换回"))
+        XCTAssertEqual(try files.map { try Data(contentsOf: $0) }, previous)
+        XCTAssertFalse(try String(contentsOf: remote.log).contains("com.82flex.trollvnc"))
     }
 }

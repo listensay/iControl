@@ -7,6 +7,7 @@ public enum InstallationStep: String, Sendable {
     case verifyPackage = "校验官方安装包"
     case upload = "传输安装文件"
     case configure = "安装并配置控制端"
+    case updateFPS = "更新 iPad 的 FPS 控制端"
     case verifyService = "验证 USB 控制服务"
     case restore = "恢复安装前的配置"
 }
@@ -189,6 +190,33 @@ public struct USBInstaller: Sendable {
                                   fpsServiceResponding: fpsResponding, serverOutput: result.outputText)
     }
 
+    public func updateFPS(device: USBDevice, credentials: SSHCredentials,
+                          progress: @Sendable (InstallationStep) -> Void = { _ in }) throws {
+        progress(.ssh)
+        let session = try SSHSession(mux: mux, device: current(device), credentials: credentials,
+                                     helper: helper, supportDirectory: supportDirectory, cancellation: nil)
+        defer { session.stop() }
+        progress(.environment)
+        let environment = try self.environment(on: session)
+        guard environment.managedByIControl, environment.canInstall else { throw ControlError("仅能更新已由 iControl 管理的 iPad；请先检测环境并确认安装权限。") }
+        progress(.verifyPackage)
+        let bytes = try FPSDaemonPackage.verifiedData(in: packages.deletingLastPathComponent())
+        let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        let stage = "/private/var/tmp/icontrol-" + UUID().uuidString.lowercased()
+        _ = try session.run("umask 077; mkdir \(shellQuote(stage))")
+        defer { _ = try? session.run("rm -rf -- \(shellQuote(stage))", timeout: 10) }
+        progress(.upload)
+        try session.upload(bytes, to: stage + "/icontrol-fpsd")
+        try session.upload(Data(RemoteScripts.configure.utf8), to: stage + "/configure.sh")
+        try session.upload(Data(RemoteFPSScripts.functions.utf8), to: stage + "/fps-functions.sh")
+        progress(.updateFPS)
+        let result = try session.run(administratorCommand(script: stage + "/configure.sh", arguments: [stage, environment.architecture, digest, "update-fps"], environment: environment),
+                                     input: administratorInput(credentials: credentials, environment: environment), timeout: 60)
+        guard result.outputText.components(separatedBy: .newlines).contains("ICONTROL:DONE=fps-updated") else {
+            throw ControlError("未收到 FPS 更新完成标识，请重新检测设备。")
+        }
+    }
+
     public func restore(device: USBDevice, credentials: SSHCredentials, cancellation: CancellationToken? = nil,
                         progress: @Sendable (InstallationStep) -> Void = { _ in }) throws {
         progress(.ssh)
@@ -272,6 +300,36 @@ public enum RemoteScripts {
       launchctl bootstrap system "$DAEMON" >/dev/null 2>&1 || launchctl load -w "$DAEMON"
       launchctl kickstart -k system/com.82flex.trollvnc >/dev/null 2>&1 || true
     }
+    if [ "$ACTION" = update-fps ]; then
+      [ -f "$STATE/fps-managed-by-icontrol" ] && [ -x "$FPS_BIN" ] && [ -f "$FPS_JOB" ] &&
+        launchctl print system/com.icontrol.fpsd | grep -Eq '^[[:space:]]*pid = [1-9][0-9]*[[:space:]]*$' || {
+        echo '未找到正在运行的受管 FPS 控制端，未修改设备。' >&2; exit 46;
+      }
+      if command -v sha256sum >/dev/null 2>&1; then SUM=$(sha256sum "$STAGE/icontrol-fpsd")
+      elif command -v shasum >/dev/null 2>&1; then SUM=$(shasum -a 256 "$STAGE/icontrol-fpsd")
+      else echo 'iPad 上没有 SHA256 校验工具，未修改设备。' >&2; exit 44; fi
+      [ "${SUM%% *}" = "$EXPECTED_HASH" ] || { echo 'FPS 控制端传输校验失败。' >&2; exit 44; }
+      cp "$FPS_BIN" "$STAGE/fps.previous"
+      rollback_fps_update() {
+        CODE=$?; trap - EXIT HUP INT TERM
+        fps_stop
+        fps_copy_or_remove "$STAGE/fps.previous" "$FPS_BIN" 755
+        fps_start
+        echo '更新失败，已换回原 FPS 控制端。' >&2; exit "$CODE"
+      }
+      trap rollback_fps_update EXIT
+      trap 'exit 130' HUP INT TERM
+      fps_stop
+      fps_copy_or_remove "$STAGE/icontrol-fpsd" "$FPS_BIN" 755
+      "$FPS_BIN" --version
+      fps_start
+      ATTEMPT=0
+      until launchctl print system/com.icontrol.fpsd | grep -Eq '^[[:space:]]*pid = [1-9][0-9]*[[:space:]]*$'; do
+        ATTEMPT=$((ATTEMPT+1)); [ "$ATTEMPT" -lt 12 ] || exit 47; sleep 1
+      done
+      trap - EXIT HUP INT TERM
+      echo 'ICONTROL:DONE=fps-updated'; exit 0
+    fi
     if [ "$ACTION" = restore ]; then
       [ -f "$STATE/managed-by-icontrol" ] || { echo '没有 iControl 配置备份。' >&2; exit 25; }
       grep -q ICONTROLConfiguration "$CFG" || { echo '配置已被其他软件修改，停止恢复。' >&2; exit 26; }

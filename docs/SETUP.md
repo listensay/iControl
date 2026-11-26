@@ -103,7 +103,7 @@ Click the game display or press **F8** to capture input. F8 releases it again. S
 
 **呼出鼠标** (Show cursor) switches to pointing mode: move to position the cursor, then left click or drag the game interface. Keyboard actions and WASD remain available. Press the cursor shortcut again to return to mouse look. The button shows **鼠标已呼出** when cursor mode is active.
 
-The cursor displayed on the iPad requires FPS daemon 1.4.0. Upgrade older services with the installer. If device cursor rendering fails, touch input can still work.
+The cursor displayed on the iPad requires FPS daemon 1.4.0 or later. If iControl installed your existing FPS daemon, open the installer and choose **检测环境** (Check Environment), then **仅更新 FPS 控制端** (Update FPS Only). This keeps your video service, passwords, and game mappings. Daemon 1.4.1 restarts a failed renderer while the cursor is requested and restores the latest position. Touch input remains available during recovery.
 
 ## Troubleshooting
 
@@ -114,7 +114,7 @@ The cursor displayed on the iPad requires FPS daemon 1.4.0. Upgrade older servic
 | Video works, FPS input does not | Check FPS daemon installation and credentials; inspect **诊断与日志** (Diagnostics & logs) |
 | Actions touch the wrong location | Fix orientation, align markers with game controls, and use coordinate calibration in the layout sidebar |
 | Diagonal movement drifts while turning the camera | In 1.4.9 or later, align the wheel with the game’s joystick, enable smooth steering, and run the W+A camera-turn test in the layout editor |
-| Cursor does not appear on the iPad | Upgrade the daemon to 1.4.0; check the cursor status message |
+| Cursor does not appear on the iPad | If the renderer is unavailable, update the iPad daemon to 1.4.1 in the installer, then summon the cursor |
 | Need a backup viewer | Open **系统屏幕共享** (System Screen Sharing) after USB forwarding is connected |
 
 Frame rate, touch recognition, and sustained gameplay depend on the hardware, game, and jailbreak. Validate the layout in the actual game. The installer requests 65% video scale and 60 FPS by default; it cannot guarantee those results.
@@ -147,11 +147,11 @@ To publish a version:
 3. Tag that commit with the matching version, for example:
 
    ```sh
-   git tag v1.4.9
-   git push origin v1.4.9
+   git tag v1.4.10
+   git push origin v1.4.10
    ```
 
-4. Actions verifies that the tag matches the app version, builds and validates the package, uploads the Mac ZIP and `SHA256SUMS.txt` to a draft release, then publishes it after both assets are uploaded. The publish job uses GitHub's built-in token; no additional secret is required.
+4. On a release tag, Actions runs `./Scripts/build-app.sh --bundled-fps` to ship the exact signed iPad daemon tested on hardware. It checks the daemon hash and its source archive against the checkout, then uploads the validated Mac ZIP and `SHA256SUMS.txt` to a draft release and publishes it. The publish job uses GitHub's built-in token; no additional secret is required.
 
 Only stable `vMAJOR.MINOR.PATCH` tags are accepted. A mismatched version fails before packaging. If publishing fails, rerun the workflow: an existing draft can be completed; an already published release is left intact. Do not move a published tag to another commit.
 

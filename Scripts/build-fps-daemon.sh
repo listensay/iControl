@@ -24,9 +24,9 @@ xcrun clang -target arm64-apple-ios14.0 -isysroot "$ICONTROL_SDK" -fobjc-arc -O2
   -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$ICONTROL_SOURCE/Info.plist" -o "$ICONTROL_BINARY"
 "$ICONTROL_LDID" -S"$ICONTROL_SOURCE/entitlements.plist" "$ICONTROL_BINARY"
 ICONTROL_HASH="$(shasum -a 256 "$ICONTROL_BINARY")"
-printf '{"version":"1.4.0","protocol":1,"deviceCursor":true,"architecture":"arm64","minimumIOS":"14.0","sha256":"%s"}\n' \
+printf '{"version":"1.4.1","protocol":1,"deviceCursor":true,"architecture":"arm64","minimumIOS":"14.0","sha256":"%s"}\n' \
   "${ICONTROL_HASH%% *}" > "$ICONTROL_RESOURCES/FPSDaemon/manifest.json"
-tar -czf "$ICONTROL_RESOURCES/ThirdPartySources/iControl-FPSDaemon-1.4.0-source.tar.gz" \
+COPYFILE_DISABLE=1 tar -czf "$ICONTROL_RESOURCES/ThirdPartySources/iControl-FPSDaemon-1.4.1-source.tar.gz" \
   -C "$ICONTROL_ROOT/Device" FPSDaemon
 cp "$ICONTROL_SOURCE/COPYING" "$ICONTROL_RESOURCES/FPSDaemon/COPYING"
 cp "$ICONTROL_SOURCE/HIDBridge.h" "$ICONTROL_RESOURCES/FPSDaemon/HIDBridge.h"

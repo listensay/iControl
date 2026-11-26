@@ -86,7 +86,7 @@ final class FPSController: ObservableObject {
     var tokenForInstallation: String? { accessToken.isEmpty ? nil : accessToken }
     var deviceCursorHint: String {
         if deviceCursorAvailable { return "iPad 游戏画面指针已就绪" }
-        return supportsDeviceCursor ? "iPad 指针显示进程未就绪，请查看设备端日志"
+        return supportsDeviceCursor ? "iPad 指针显示进程未就绪；若呼出后仍不显示，请在安装器中更新至 1.4.1"
             : "iPad 指针需安装 / 配置 1.4.0 控制端"
     }
 

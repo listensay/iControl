@@ -307,7 +307,7 @@ int main(int argc, const char **argv) {
         }
         const char *token_path = NULL, *log_path = NULL; unsigned port = 5902;
         for (int i = 1; i < argc; ++i) {
-            if (!strcmp(argv[i], "--version")) { puts("icontrol-fpsd 1.4.0 protocol=1 cursor=1 contacts=10 watchdog=350ms"); return 0; }
+            if (!strcmp(argv[i], "--version")) { puts("icontrol-fpsd 1.4.1 protocol=1 cursor=1 contacts=10 watchdog=350ms"); return 0; }
             if (!strcmp(argv[i], "--token-file") && i + 1 < argc) token_path = argv[++i];
 #ifdef FPSD_SIMULATOR
             else if (!strcmp(argv[i], "--event-log") && i + 1 < argc) log_path = argv[++i];
