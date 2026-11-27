@@ -119,9 +119,17 @@ iPad 本机显示游戏指针需要 FPS 控制端 1.4.0 或更高版本。若之
 
 帧率、触摸识别和持续游戏操作效果取决于硬件、游戏和越狱环境，需要在实际游戏中确认。默认请求 65% 分辨率和 60 FPS，不能保证达到这些数值。
 
+### 真机输入验收
+
+在能看清摇杆、动作按钮的训练场景中验证。以下步骤同时覆盖 Mac 事件捕获、USB 传输与设备实际触点；Cargo 测试或模拟器不能测出整条链路的延迟。
+
+1. 按住 W、加按 A，同时转动鼠标，再松开两个按键。摇杆应以同一触点转入斜向，松开后抬起；停止移动鼠标后不应延迟补转。
+2. 快速转动鼠标的同时，对已映射的按钮交替短按、长按。每次短按只触发一次；松开长按不应中断其他按住的动作。切换到游戏鼠标模式拖动，再回到视角控制，之前的点击不应保持按下。
+3. 按住移动键与动作键，用 F8 结束捕获；再分别通过切换应用、拔掉 USB 重试。释放或设备看门狗生效后不应残留触点。重新捕获或重连后先不要移动，确认不重放旧位移或点击。
+
 ## 源码构建与版本发布
 
-使用 Apple Silicon Mac、macOS 14+、Apple Command Line Tools、Swift 6+、Python 3 与 Node.js 22+，在仓库根目录执行：
+Mac 打包需要 Apple Silicon Mac、macOS 14+、Apple Command Line Tools（macOS SDK、`xcrun`、`lipo`）、Swift 6+、稳定版 Rust（`rustc` 和 `cargo`）、Python 3.9+ 与 Node.js 22+。Rust 只是编译工具，运行打包好的应用时，Mac 与 iPad 均无需安装 Rust。在仓库根目录执行：
 
 ```sh
 ./Scripts/test.sh
@@ -130,9 +138,11 @@ node Tools/verify-fps-viewer-lifecycle.mjs
 python3 Tools/verify-docs.py
 python3 Tools/verify-release-workflow.py
 ./Scripts/build-app.sh
-swift run -Xswiftc -enable-testing iControlValidation \
-  --check-native-askpass dist/iControl.app/Contents/MacOS/iControl
 ```
+
+`test.sh` 运行 Cargo 测试，构建 Rust 静态库，再用 C 接口和本地模拟控制端验证按放顺序、回执停顿和会话清理；之后构建本机控制端模拟器并链接 Swift 模拟工具。旧版 `iControlValidation` 可执行程序及其原生 askpass 检查需要 `Tests/TestSupport` 和 `Tests/IControlCoreTests`；当前仓库不包含这两个目录，跳过不代表通过。在 macOS 或 Linux 上仅测试 Rust 核心可运行 `cargo test --locked --offline --manifest-path Rust/InputCore/Cargo.toml`。
+
+**直接使用 SwiftPM：** SwiftPM 不会运行 Cargo。首次运行 `swift build`、`swift run` 前，以及每次修改 Rust 源码后，都要先准备相同架构和配置的库。例如：`./Scripts/build-input-core.sh debug && swift build --product iControl`。对于 `swift build -c release`，先运行 `./Scripts/build-input-core.sh release`。脚本将 `libicontrol_input.a` 写入 `work/rust-input/{debug,release}/`，并通过构建标记让仅修改 Rust 的情况也能触发重新链接，无需全局安装库、设置动态库路径或另传链接参数。`test.sh` 和 `build-app.sh` 会自动完成此步骤。
 
 设备端面向 arm64 iOS 14+，首次构建会将固定版本 SDK 和通过 SHA-256 校验的 ldid 下载到 `work/toolchain/`。可通过 `ICONTROL_IPHONE_SDK` 和 `ICONTROL_LDID_PATH` 指定现有工具链。
 
@@ -147,8 +157,8 @@ Mac 打包生成 `dist/iControl.app`、`dist/iControl-版本号-mac.zip` 和 `di
 3. 给该提交打上匹配版本的标签，例如：
 
    ```sh
-   git tag v1.4.10
-   git push origin v1.4.10
+   git tag v1.4.11
+   git push origin v1.4.11
    ```
 
 4. 版本标签触发 Actions 执行 `./Scripts/build-app.sh --bundled-fps`，使用已在真机验证的同一份 iPad 控制端。打包时校验控制端哈希，并逐项核对源码归档与当前提交。Mac ZIP 和 `SHA256SUMS.txt` 上传至草稿后才会公开发布。发布任务使用 GitHub 内置令牌，无需额外密钥。

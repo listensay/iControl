@@ -8,7 +8,7 @@ A native macOS app with an integrated iPad display, editable touch mappings, and
 
 [Download for Mac](https://github.com/listensay/icontrol/releases) · [Prerequisites & setup guide](docs/SETUP.md) · [中文准备与使用教程](docs/SETUP.zh-CN.md)
 
-Mac **1.4.10 (18)** · Apple Silicon · macOS 14+ · iPad FPS daemon **1.4.1**
+Mac **1.4.11 (19)** · Apple Silicon · macOS 14+ · iPad FPS daemon **1.4.1**
 
 ## In the game
 
@@ -48,9 +48,10 @@ Settings separate input preferences from action mappings. Geometry and swipe pat
 
 ```mermaid
 flowchart LR
-    UI[SwiftUI desktop controls] --> Core[Swift input and connection core]
+    UI[SwiftUI desktop controls] --> Core[Swift capture and connections]
     UI --> Web[WebKit · noVNC viewer]
-    Core --> USB[USB transport · usbmuxd]
+    Core --> Input[Rust FPS input worker]
+    Input --> USB[USB transport · usbmuxd]
     Web --> Local[Mac loopback forwarder]
     Local --> USB
     USB --> VNC[iPad TrollVNC · 5901]
@@ -59,16 +60,17 @@ flowchart LR
     FPS --> HID[HID multi-touch and game cursor]
 ```
 
-Display and FPS input travel through separate connections. The VNC viewer handles video and ordinary desktop interaction; the FPS engine sends touch snapshots directly to the daemon. The local web server and forwarding ports bind to loopback addresses.
+Display and FPS input travel through separate connections. Swift captures Mac events and passes them through a C interface to the Rust input worker. The worker advances gesture timing and sends touch snapshots without waiting for USB on the UI thread. Key/button down and up are discrete events: their order matters even when both arrive within one input tick. Relative mouse motion is combined for a tick; stale motion must not play back after a stall. A separate reader handles daemon acknowledgements. The VNC viewer and loopback forwarder remain independent of this queue.
 
 | Component | Location | Role |
 | --- | --- | --- |
 | Desktop app | `Sources/IControlApp` | SwiftUI, WebKit bridge, capture, settings, installer, and Keychain integration |
-| Core | `Sources/IControlCore` | USB/VNC/SSH connections, profiles, layout drafts, and multi-touch input |
+| Core | `Sources/IControlCore` | USB/VNC/SSH connections, profiles, layout drafts, and the Swift input bridge |
+| FPS input | `Rust/InputCore`, `Sources/CRustInput` | Mac-side event queue, touch mapping and daemon communication, linked via a C ABI |
 | Native transport | `Sources/CTransport` | Socket and platform transport support |
 | Device service | `Device/FPSDaemon` | Independent arm64 iOS service for touch injection and the device cursor |
 | Viewer | `Sources/IControlApp/Resources/Viewer` | Bundled noVNC client and editable mapping overlay |
-| Validation | `Tests`, `Tools/Simulator` | Protocol, input lifecycle, installation, layout, and simulator checks |
+| Validation | `Rust/InputCore`, `Tools/Simulator` | Cargo tests for the input core and Mac simulator fixture; the legacy Swift validation suite is not present in this checkout |
 
 ## Technical details
 

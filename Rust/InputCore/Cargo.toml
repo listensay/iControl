@@ -1,0 +1,9 @@
+[package]
+name = "icontrol-input"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "icontrol_input"
+crate-type = ["staticlib"]

@@ -8,7 +8,7 @@
 
 [下载 Mac 版](https://github.com/listensay/icontrol/releases) · [前提准备与使用教程](docs/SETUP.zh-CN.md) · [English setup guide](docs/SETUP.md)
 
-Mac **1.4.10（18）** · Apple Silicon · macOS 14+ · iPad FPS 控制端 **1.4.1**
+Mac **1.4.11（19）** · Apple Silicon · macOS 14+ · iPad FPS 控制端 **1.4.1**
 
 ## 游戏内画面
 
@@ -48,9 +48,10 @@ Mac **1.4.10（18）** · Apple Silicon · macOS 14+ · iPad FPS 控制端 **1.4
 
 ```mermaid
 flowchart LR
-    UI[SwiftUI 桌面界面] --> Core[Swift 输入与连接核心]
+    UI[SwiftUI 桌面界面] --> Core[Swift 事件捕获与连接管理]
     UI --> Web[WebKit · noVNC 画面]
-    Core --> USB[USB 传输 · usbmuxd]
+    Core --> Input[Rust FPS 输入工作线程]
+    Input --> USB[USB 传输 · usbmuxd]
     Web --> Local[Mac 回环转发服务]
     Local --> USB
     USB --> VNC[iPad TrollVNC · 5901]
@@ -59,16 +60,17 @@ flowchart LR
     FPS --> HID[HID 多点触摸与游戏指针]
 ```
 
-画面与 FPS 输入通过独立连接传输。VNC 客户端处理视频和普通操作，FPS 引擎直接向控制端发送触点快照。本地网页服务和端口转发只监听回环地址。
+画面与 FPS 输入通过独立连接传输。Swift 捕获 Mac 事件，通过 C ABI 将事件交给 Rust 输入工作线程；手势计时与触点快照发送不让界面线程等待 USB。按键和鼠标按钮的按下、抬起是离散事件，即使发生在同一输入周期内也要保留顺序。相对鼠标位移按输入周期合并，停顿后不补播过期位移。另有读取线程处理控制端回执；VNC 画面与回环转发不经过此输入队列。
 
 | 模块 | 位置 | 职责 |
 | --- | --- | --- |
 | 桌面应用 | `Sources/IControlApp` | SwiftUI、WebKit 桥接、输入捕获、设置、安装和钥匙串 |
-| 核心逻辑 | `Sources/IControlCore` | USB/VNC/SSH 连接、配置、布局草稿和多点输入 |
+| 核心逻辑 | `Sources/IControlCore` | USB/VNC/SSH 连接、配置、布局草稿和 Swift 输入桥接 |
+| FPS 输入 | `Rust/InputCore`、`Sources/CRustInput` | Mac 端事件队列、触点映射与控制端通信，通过 C ABI 静态链接 |
 | 原生传输 | `Sources/CTransport` | 套接字与平台传输支持 |
 | 设备服务 | `Device/FPSDaemon` | 独立 arm64 iOS 服务，注入触摸并显示设备指针 |
 | 画面客户端 | `Sources/IControlApp/Resources/Viewer` | 内置 noVNC 与可编辑映射覆盖层 |
-| 验证工具 | `Tests`、`Tools/Simulator` | 协议、输入生命周期、安装、布局与模拟验证 |
+| 验证工具 | `Rust/InputCore`、`Tools/Simulator` | Cargo 输入核心测试与 Mac 模拟工具；当前仓库不包含旧版 Swift 验证套件 |
 
 ## 技术说明
 

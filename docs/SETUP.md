@@ -119,9 +119,17 @@ The cursor displayed on the iPad requires FPS daemon 1.4.0 or later. If iControl
 
 Frame rate, touch recognition, and sustained gameplay depend on the hardware, game, and jailbreak. Validate the layout in the actual game. The installer requests 65% video scale and 60 FPS by default; it cannot guarantee those results.
 
+### Manual input checks on a real iPad
+
+Use a practice screen with visible movement and action buttons. These checks exercise macOS event capture, USB and device touch delivery together; a Cargo test or simulator run does not measure end-to-end latency.
+
+1. Hold W, add A while turning the mouse, then release both. The same joystick contact should steer into the diagonal, then lift. The camera must stop when the mouse stops, without a delayed turn.
+2. While turning rapidly, alternate very short presses and holds on a mapped button. Each tap should register once; releasing a hold must not release an unrelated action. Toggle cursor mode and drag: the last click must lift before returning to mouse look.
+3. Hold a movement key and an action, then release capture with F8. Repeat by switching apps, and once by unplugging USB. After release or the device watchdog, no contact should remain down. Recapture or reconnect without moving: no old motion or clicks should replay.
+
 ## Build and release from source
 
-Build on an Apple Silicon Mac with macOS 14+, Apple Command Line Tools, Swift 6+, Python 3, and Node.js 22+. Run from the repository root:
+Build the Mac package on an Apple Silicon Mac with macOS 14+, Apple Command Line Tools (macOS SDK, `xcrun`, `lipo`), Swift 6+, stable Rust (`rustc` and `cargo`), Python 3.9+ and Node.js 22+. Rust is only a build prerequisite: neither the Mac running the packaged app nor the iPad needs a Rust installation. Run from the repository root:
 
 ```sh
 ./Scripts/test.sh
@@ -130,9 +138,11 @@ node Tools/verify-fps-viewer-lifecycle.mjs
 python3 Tools/verify-docs.py
 python3 Tools/verify-release-workflow.py
 ./Scripts/build-app.sh
-swift run -Xswiftc -enable-testing iControlValidation \
-  --check-native-askpass dist/iControl.app/Contents/MacOS/iControl
 ```
+
+`test.sh` runs the Cargo tests, builds the Rust static library, and exercises its C ABI against a local peer (edge order, stalled ACKs, and teardown). It then builds the native daemon simulator and links the Swift simulator. The legacy `iControlValidation` executable and its native askpass check require both `Tests/TestSupport` and `Tests/IControlCoreTests`; these directories are absent from this checkout. A skipped legacy check is not a passing test. On macOS or Linux, run just the portable input tests with `cargo test --locked --offline --manifest-path Rust/InputCore/Cargo.toml`.
+
+**Direct SwiftPM builds:** SwiftPM does not run Cargo. Before `swift build` or `swift run`, and after changing Rust code, prepare the matching archive. `./Scripts/build-input-core.sh debug && swift build --product iControl` builds for the host. For `swift build -c release`, use `./Scripts/build-input-core.sh release` first. The helper writes `work/rust-input/{debug,release}/libicontrol_input.a` and a build stamp that triggers relinking when only Rust changes. No global library install, linker flags or dynamic library paths are needed. `test.sh` and `build-app.sh` do this step for you.
 
 The daemon targets arm64 iOS 14+. Its first build fetches a pinned SDK revision and a SHA-256-verified ldid binary into `work/toolchain/`. Override `ICONTROL_IPHONE_SDK` and `ICONTROL_LDID_PATH` to use an existing toolchain.
 
@@ -147,8 +157,8 @@ To publish a version:
 3. Tag that commit with the matching version, for example:
 
    ```sh
-   git tag v1.4.10
-   git push origin v1.4.10
+   git tag v1.4.11
+   git push origin v1.4.11
    ```
 
 4. On a release tag, Actions runs `./Scripts/build-app.sh --bundled-fps` to ship the exact signed iPad daemon tested on hardware. It checks the daemon hash and its source archive against the checkout, then uploads the validated Mac ZIP and `SHA256SUMS.txt` to a draft release and publishes it. The publish job uses GitHub's built-in token; no additional secret is required.

@@ -13,6 +13,8 @@ final class FPSCaptureView: NSView {
     private var originalPointer: CGPoint?
     private var cursorHidden = false
     private var inputCaptured = false
+    private var captureStartedAt: TimeInterval = 0
+    private var previousModifiers: NSEvent.ModifierFlags = []
     private var ignoredWarpMove = false
     private var lastMouseLocation: NSPoint?
     private var showingPointer = false
@@ -28,13 +30,15 @@ final class FPSCaptureView: NSView {
     }
     override func mouseDown(with event: NSEvent) { controller?.capture() }
     override func keyDown(with event: NSEvent) {
-        if event.keyCode == 100 { controller?.toggleCapture() }
+        if event.keyCode == 100, !event.isARepeat { controller?.toggleCapture() }
     }
 
     func updateCapture(_ capture: Bool) {
         guard capture != inputCaptured else { return }
         if capture {
             guard let window, window.isKeyWindow, NSApp.isActive else { controller?.releaseCapture(); return }
+            captureStartedAt = ProcessInfo.processInfo.systemUptime
+            previousModifiers = NSEvent.modifierFlags
             inputCaptured = true; window.makeFirstResponder(self); window.acceptsMouseMovedEvents = true
             originalPointer = CGEvent(source: nil)?.location
             let anchor = convert(NSPoint(x: bounds.midX, y: bounds.midY), to: nil)
@@ -82,7 +86,6 @@ final class FPSCaptureView: NSView {
                 let local = NSPoint(x: rect.x + rect.width / 2, y: bounds.height - rect.y - rect.height / 2)
                 let screen = window.convertPoint(toScreen: convert(local, to: nil))
                 CGWarpMouseCursorPosition(.init(x: screen.x, y: (NSScreen.screens.first?.frame.maxY ?? 0) - screen.y))
-                controller?.pointerMoved(.init(x: 0.5, y: 0.5))
             }
         } else {
             guard let window else { controller?.releaseCapture(); return }
@@ -101,8 +104,15 @@ final class FPSCaptureView: NSView {
         return controller?.renderedViewport?.normalized(x: local.x, y: bounds.height - local.y, clamp: clamp)
     }
 
+    private func motionAge(_ event: NSEvent) -> TimeInterval {
+        max(0, ProcessInfo.processInfo.systemUptime - event.timestamp)
+    }
+
     private func handle(_ event: NSEvent) -> NSEvent? {
         guard inputCaptured, let controller else { return event }
+        // AppKit may deliver a previous capture's queued edges to the new monitor.
+        // Within the current capture only movement expires; never age out an up/down.
+        guard event.timestamp >= captureStartedAt else { return event.window === window ? nil : event }
         guard event.window === window, window?.isKeyWindow == true, NSApp.isActive else {
             controller.releaseCapture(); return event
         }
@@ -113,18 +123,30 @@ final class FPSCaptureView: NSView {
         }
         switch event.type {
         case .keyDown:
-            if event.keyCode == 100 { controller.releaseCapture(); return nil }
+            if event.keyCode == 100 {
+                if !event.isARepeat { controller.releaseCapture() }
+                return nil
+            }
             if !event.isARepeat, let code = FPSKey.macKeyCodes[event.keyCode] { controller.keyDown(code) }
         case .keyUp:
             if let code = FPSKey.macKeyCodes[event.keyCode] { controller.keyUp(code) }
         case .flagsChanged:
-            for (flag, code) in [(NSEvent.ModifierFlags.shift, "Shift"), (.control, "Control"), (.option, "Option")] {
+            // Track aggregate flag edges, including left/right pairs. A modifier
+            // already held at capture start is not a new physical press.
+            let changed = previousModifiers.symmetricDifference(event.modifierFlags)
+            previousModifiers = event.modifierFlags
+            for (flag, code) in [(NSEvent.ModifierFlags.shift, "Shift"), (.control, "Control"), (.option, "Option")] where changed.contains(flag) {
                 if event.modifierFlags.contains(flag) { controller.keyDown(code) } else { controller.keyUp(code) }
             }
         case .mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged:
             if controller.cursorMode {
-                if let point = pointerPoint(event, clamp: pointerPressed) { controller.pointerMoved(point) }
-                else { controller.pointerHoverOutside() }
+                if let point = pointerPoint(event, clamp: pointerPressed) {
+                    controller.pointerMoved(point, age: motionAge(event))
+                } else if motionAge(event) <= 0.025 {
+                    // Hide has no age parameter. Don't turn an expired hover sample
+                    // into a fresh hide (same three-tick freshness bound as motion).
+                    controller.pointerHoverOutside()
+                }
                 break
             }
             let location = event.locationInWindow
@@ -138,7 +160,7 @@ final class FPSCaptureView: NSView {
             if dx == 0, dy == 0, let previous = lastMouseLocation {
                 dx = location.x - previous.x; dy = previous.y - location.y
             }
-            controller.mouse(dx: dx, dy: dy)
+            controller.mouse(dx: dx, dy: dy, age: motionAge(event))
         case .leftMouseDown:
             lastMouseLocation = event.locationInWindow
             if controller.cursorMode {
@@ -147,7 +169,9 @@ final class FPSCaptureView: NSView {
         case .leftMouseUp:
             lastMouseLocation = event.locationInWindow
             if controller.cursorMode {
-                if pointerPressed, let point = pointerPoint(event, clamp: true) { controller.pointerMoved(point) }
+                if pointerPressed, let point = pointerPoint(event, clamp: true) {
+                    controller.pointerMoved(point, age: motionAge(event))
+                }
                 pointerPressed = false; controller.pointerUp()
             }
             else { controller.keyUp("MouseLeft") }
@@ -170,7 +194,7 @@ final class FPSCaptureView: NSView {
     }
     func restoreCursor() {
         guard inputCaptured || originalPointer != nil || cursorHidden || monitor != nil else { return }
-        inputCaptured = false
+        inputCaptured = false; captureStartedAt = 0; previousModifiers = []
         showingPointer = false; pointerPressed = false
         lastMouseLocation = nil; ignoredWarpMove = false
         if let monitor { NSEvent.removeMonitor(monitor); self.monitor = nil }

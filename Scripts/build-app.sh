@@ -21,6 +21,7 @@ python3 Tools/verify-fps-package.py
   cd "$ICONTROL_PACKAGES"
   shasum -a 256 -c SHA256SUMS.txt
 )
+"$ICONTROL_ROOT/Scripts/build-input-core.sh" release
 swift build --configuration release --product iControl
 ICONTROL_BIN_DIR="$(swift build --configuration release --show-bin-path)"
 ICONTROL_STAGING="$ICONTROL_DIST/iControl-staging.app"

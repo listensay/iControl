@@ -43,15 +43,14 @@ final class FPSController: ObservableObject {
     private var accessToken = ""
     private var sessionTokens: [String: String] = [:]
     private var link: FPSUSBLink?
-    private var input: FPSInputEngine?
-    private var tick: Timer?
+    // Only AppKit/SwiftUI feedback is resolved here. The link owns gameplay state.
+    private var keyFeedback: [String: (action: String?, togglesCursor: Bool)] = [:]
+    private var physicalKeysDown = Set<String>()
     private(set) var renderedViewport: FPSViewport?
     private var epoch = UUID()
     private var lastAttempt: TimeInterval = 0
     private var editingSelection = false
     private var lastScroll: TimeInterval = 0
-    private var pendingDeviceCursor: FPSPoint?
-    private var sentDeviceCursor: FPSPoint?
     private var layoutSession = ""
     private var layoutSequence = 0
     private var layoutDeviceUDID: String?
@@ -210,57 +209,60 @@ final class FPSController: ObservableObject {
 
     func toggleCapture() { captured ? releaseCapture() : capture() }
     func capture() {
-        guard enabled, ready, videoReady, calibration == nil, !isEditingLayout, !showSettings, !captured else { return }
+        guard enabled, ready, videoReady, calibration == nil, !isEditingLayout, !showSettings, !captured,
+              let link else { return }
         do {
-            input = try FPSInputEngine(profile: profile); input?.setAspect(aspect)
-            if let empty = input?.start() { link?.send(empty) }
+            try link.startCapture(profile: profile, aspect: aspect)
+            prepareKeyFeedback()
             captured = true; cursorMode = false
             status = "游戏输入已捕获 · \(FPSKey.title(profile.cursorToggleKey)) 呼出鼠标 · F8 释放"
             captureChanged?(true); visualsChanged?()
-            guard captured else { return }
-            let timer = Timer(timeInterval: 1.0 / 120.0, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { self?.advance() }
-            }
-            tick = timer; RunLoop.main.add(timer, forMode: .common)
         } catch { status = error.localizedDescription }
     }
+    private func prepareKeyFeedback() {
+        let buttons = profile.buttons.filter(\.enabled)
+        for code in FPSKey.choices {
+            let linked = Set(profile.linkedKeys(from: code))
+            let titles = buttons.compactMap { linked.contains($0.trigger) ? $0.title : nil }
+            let togglesCursor = linked.contains(FPSKey.cursorAction)
+            if togglesCursor || !titles.isEmpty {
+                let action = titles.isEmpty ? nil : "\(titles.joined(separator: " + ")) · \(FPSKey.title(code))"
+                keyFeedback[code] = (action, togglesCursor)
+            }
+        }
+    }
     func releaseCapture() {
-        tick?.invalidate(); tick = nil
-        _ = input?.releaseAll(); input = nil
         link?.releaseAll()
         let wasCaptured = captured; captured = false; cursorMode = false
-        pendingDeviceCursor = nil; sentDeviceCursor = nil
+        physicalKeysDown.removeAll(); keyFeedback.removeAll(); lastScroll = 0
+        if !lastAction.isEmpty { lastAction = "" }
         if wasCaptured { captureChanged?(false); visualsChanged?() }
         if ready, !isEditingLayout { status = "输入已释放；点击画面或按 F8 继续。" }
     }
     func keyDown(_ code: String) {
+        // Linked cursor actions are edges, not repeats while the source is held.
+        guard captured, physicalKeysDown.insert(code).inserted else { return }
         if code == profile.cursorToggleKey { toggleCursorMode(); return }
-        let frames = input?.keyDown(code, now: ProcessInfo.processInfo.systemUptime) ?? []
-        let linked = Set(profile.linkedKeys(from: code))
-        let actions = profile.buttons.filter { $0.enabled && linked.contains($0.trigger) }
-        if !frames.isEmpty, !actions.isEmpty {
-            lastAction = "\(actions.map(\.title).joined(separator: " + ")) · \(FPSKey.title(code))"
+        link?.key(code, down: true)
+        if let feedback = keyFeedback[code] {
+            if let action = feedback.action, lastAction != action { lastAction = action }
+            if feedback.togglesCursor { toggleCursorMode() }
         }
-        send(frames)
-        if let next = input?.cursorMode, next != cursorMode { applyCursorMode(next) }
     }
-    func keyUp(_ code: String) { send(input?.keyUp(code, now: ProcessInfo.processInfo.systemUptime) ?? []) }
+    func keyUp(_ code: String) {
+        guard captured, physicalKeysDown.remove(code) != nil, code != profile.cursorToggleKey else { return }
+        link?.key(code, down: false)
+    }
     func toggleCursorMode() {
         guard captured else { return }
         let next = !cursorMode
-        send(input?.setCursorMode(next, now: ProcessInfo.processInfo.systemUptime) ?? [])
-        applyCursorMode(next)
-    }
-    private func applyCursorMode(_ next: Bool) {
+        link?.cursorMode(next)
+        // Changing mode releases gameplay mouse buttons; their ups may now be pointer events.
+        physicalKeysDown = physicalKeysDown.filter { !$0.hasPrefix("Mouse") }
         cursorMode = next; cursorModeChanged?(next); visualsChanged?()
         guard captured else { return }
-        if next {
-            if pendingDeviceCursor == nil { pendingDeviceCursor = .init(x: 0.5, y: 0.5) }
-            sentDeviceCursor = nil; flushDeviceCursor(); updateCursorStatus()
-        } else {
-            pendingDeviceCursor = nil; sentDeviceCursor = nil; link?.setDeviceCursor(nil)
-            status = "游戏输入已捕获 · \(FPSKey.title(profile.cursorToggleKey)) 呼出鼠标 · F8 释放"
-        }
+        if next { updateCursorStatus() }
+        else { status = "游戏输入已捕获 · \(FPSKey.title(profile.cursorToggleKey)) 呼出鼠标 · F8 释放" }
     }
     func showGameCursor() {
         if !captured { capture() }
@@ -273,37 +275,30 @@ final class FPSController: ObservableObject {
         status = "\(location) · 左键点击 / 拖动 · \(FPSKey.title(profile.cursorToggleKey)) 恢复转向"
     }
     func pointerDown(_ point: FPSPoint) {
-        pendingDeviceCursor = point; flushDeviceCursor()
-        send(input?.pointerDown(at: point, now: ProcessInfo.processInfo.systemUptime) ?? [])
+        guard captured, cursorMode else { return }
+        link?.pointerDown(point)
     }
-    func pointerMoved(_ point: FPSPoint) {
-        guard cursorMode, point.isValid else { return }
-        pendingDeviceCursor = point; input?.pointerMoved(to: point)
+    func pointerMoved(_ point: FPSPoint, age: TimeInterval) {
+        guard captured, cursorMode else { return }
+        link?.pointerMoved(point, age: age)
     }
     func pointerHoverOutside() {
-        guard cursorMode, pendingDeviceCursor != nil || sentDeviceCursor != nil else { return }
-        pendingDeviceCursor = nil; sentDeviceCursor = nil; link?.setDeviceCursor(nil)
+        guard captured, cursorMode else { return }
+        link?.pointerHoverOutside()
     }
     func pointerUp() {
-        flushDeviceCursor()
-        send(input?.pointerUp(now: ProcessInfo.processInfo.systemUptime) ?? [])
+        guard captured, cursorMode else { return }
+        link?.pointerUp()
     }
-    func mouse(dx: Double, dy: Double) { input?.mouseMoved(dx: dx, dy: dy, now: ProcessInfo.processInfo.systemUptime) }
+    func mouse(dx: Double, dy: Double, age: TimeInterval) {
+        guard captured, !cursorMode else { return }
+        link?.mouse(dx: dx, dy: dy, age: age)
+    }
     func scroll(_ amount: Double) {
         let now = ProcessInfo.processInfo.systemUptime
-        guard !cursorMode, profile.wheelSwitchWeapons, abs(amount) > 0.01, now - lastScroll >= 0.15 else { return }
-        lastScroll = now; send(input?.pulse(amount > 0 ? .weapon1 : .weapon2, now: now) ?? [])
+        guard captured, !cursorMode, profile.wheelSwitchWeapons, abs(amount) > 0.01, now - lastScroll >= 0.15 else { return }
+        lastScroll = now; link?.pulse(amount > 0 ? .weapon1 : .weapon2)
     }
-    private func advance() {
-        flushDeviceCursor()
-        send(input?.advance(now: ProcessInfo.processInfo.systemUptime) ?? [])
-    }
-    private func flushDeviceCursor() {
-        guard cursorMode, let point = pendingDeviceCursor, point != sentDeviceCursor else { return }
-        link?.setDeviceCursor(.init(point: profile.touchMapping.apply(point), orientation: profile.orientation))
-        sentDeviceCursor = point
-    }
-    private func send(_ frames: [FPSState]) { for state in frames { link?.send(state) } }
 
     func viewport(width: Int, height: Int) {
         guard width > 0, height > 0 else { return }
@@ -312,7 +307,8 @@ final class FPSController: ObservableObject {
         if captured, (aspect > 1) != (next > 1) {
             releaseCapture(); status = "iPad 屏幕方向已变化，已释放输入。请重新捕获鼠标。"
         }
-        viewportAspect = next; input?.setAspect(next)
+        viewportAspect = next
+        if captured { link?.setAspect(next) }
     }
     func viewportRect(_ rect: FPSViewport) {
         guard rect.isValid else { return }
