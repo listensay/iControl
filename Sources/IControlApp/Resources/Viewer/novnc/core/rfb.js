@@ -143,6 +143,8 @@ export default class RFB extends EventTargetMixin {
 
         this._supportsContinuousUpdates = false;
         this._enabledContinuousUpdates = false;
+        this._awaitingContinuousStop = false;
+        this._frameUpdatesPaused = false;
 
         this._supportsSetDesktopSize = false;
         this._screenID = 0;
@@ -313,6 +315,28 @@ export default class RFB extends EventTargetMixin {
                 this._keyboard.ungrab();
             } else {
                 this._keyboard.grab();
+            }
+        }
+    }
+
+    // iControl: pause at the RFB producer, not just at the canvas. Finish any
+    // in-flight frame so compressed streams and the input connection stay valid.
+    set frameUpdatesPaused(value) {
+        const paused = Boolean(value);
+        if (paused === this._frameUpdatesPaused) { return; }
+        this._frameUpdatesPaused = paused;
+        if (this._rfbConnectionState !== 'connected') { return; }
+        if (paused) {
+            if (this._enabledContinuousUpdates) {
+                this._enabledContinuousUpdates = false;
+                this._awaitingContinuousStop = true;
+                RFB.messages.enableContinuousUpdates(this._sock, false, 0, 0, 0, 0);
+            }
+        } else {
+            RFB.messages.fbUpdateRequest(this._sock, false, 0, 0, this._fbWidth, this._fbHeight);
+            if (this._supportsContinuousUpdates && !this._awaitingContinuousStop) {
+                this._enabledContinuousUpdates = true;
+                this._updateContinuousUpdates();
             }
         }
     }
@@ -2442,11 +2466,11 @@ export default class RFB extends EventTargetMixin {
             msgType = this._sock.rQshift8();
         }
 
-        let first, ret;
+        let ret;
         switch (msgType) {
             case 0:  // FramebufferUpdate
                 ret = this._framebufferUpdate();
-                if (ret && !this._enabledContinuousUpdates) {
+                if (ret && !this._frameUpdatesPaused && !this._enabledContinuousUpdates) {
                     RFB.messages.fbUpdateRequest(this._sock, true, 0, 0,
                                                  this._fbWidth, this._fbHeight);
                 }
@@ -2465,19 +2489,20 @@ export default class RFB extends EventTargetMixin {
             case 3:  // ServerCutText
                 return this._handleServerCutText();
 
-            case 150: // EndOfContinuousUpdates
-                first = !this._supportsContinuousUpdates;
+            case 150: { // EndOfContinuousUpdates
+                // A disable can still be in flight after a rapid pause/resume.
+                // An unsolicited stop, however, means fall back to pull updates.
+                const expected = !this._supportsContinuousUpdates || this._awaitingContinuousStop;
                 this._supportsContinuousUpdates = true;
-                this._enabledContinuousUpdates = false;
-                if (first) {
-                    this._enabledContinuousUpdates = true;
+                this._awaitingContinuousStop = false;
+                this._enabledContinuousUpdates = expected && !this._frameUpdatesPaused;
+                if (this._enabledContinuousUpdates) {
                     this._updateContinuousUpdates();
-                    Log.Info("Enabling continuous updates.");
-                } else {
-                    // FIXME: We need to send a framebufferupdaterequest here
-                    // if we add support for turning off continuous updates
+                } else if (!this._frameUpdatesPaused) {
+                    RFB.messages.fbUpdateRequest(this._sock, true, 0, 0, this._fbWidth, this._fbHeight);
                 }
                 return true;
+            }
 
             case 248: // ServerFence
                 return this._handleServerFenceMsg();

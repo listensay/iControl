@@ -13,6 +13,8 @@ final class ViewerDriver: ObservableObject {
         } else { arguments = "" }
         webView?.evaluateJavaScript("window.iControl?.\(function)(\(arguments))", completionHandler: nil)
     }
+    /// Pin all packets (including the final up) to the web view that accepted entry.
+    func edgePointerChannel() -> EdgePointerChannel? { webView.map { EdgePointerChannel(view: $0) } }
     func disconnect() { execute("disconnect") }
     func credentials(_ password: String) { execute("credentials", argument: password) }
     func home() { fpsController?.releaseCapture(); execute("home") }
@@ -85,15 +87,21 @@ struct ViewerView: NSViewRepresentable {
             applyFPS()
         }
         func applyFPS() {
-            guard ready, let fps = model?.fpsController,
-                  let json = try? fps.viewerJSON() else { return }
+            guard ready, let fps = model?.fpsController else { return }
+            // Keep the native capture surface and its canvas bounds alive, but skip
+            // building and bridging the mapping overlay while watching the iPad.
+            let json: String
+            if fps.directView { json = "{}" }
+            else if let profile = try? fps.viewerJSON() { json = profile }
+            else { return }
             let enabled = fps.enabled ? "true" : "false"
             let markers = fps.showMarkers && !fps.captured && !fps.layoutTesting ? "true" : "false"
             let captured = fps.captured ? "true" : "false"
             let cursor = fps.cursorMode ? "true" : "false"
             let key = FPSKey.title(fps.profile.cursorToggleKey)
             let keyJSON = String(data: (try? JSONSerialization.data(withJSONObject: [key])) ?? Data("[\"`\"]".utf8), encoding: .utf8) ?? "[\"`\"]"
-            let script = "window.iControl?.setFPSMode(\(enabled), \(json), \(markers), \(captured), \(cursor), \(keyJSON)[0])"
+            let paused = fps.directView ? "true" : "false"
+            let script = "window.iControl?.setFPSMode(\(enabled), \(json), \(markers), \(captured), \(cursor), \(keyJSON)[0], \(paused))"
             guard script != lastFPSPayload else { return }
             lastFPSPayload = script
             view?.evaluateJavaScript(script, completionHandler: nil)
@@ -114,7 +122,7 @@ struct ViewerView: NSViewRepresentable {
         }
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
             model?.viewerEvent(["type": "disconnected"], source: url)
-            ready = false; appliedAttempt = -1; webView.reload()
+            ready = false; appliedAttempt = -1; lastFPSPayload = ""; webView.reload()
         }
     }
 }

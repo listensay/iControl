@@ -105,6 +105,14 @@ Click the game display or press **F8** to capture input. F8 releases it again. S
 
 The cursor displayed on the iPad requires FPS daemon 1.4.0 or later. If iControl installed your existing FPS daemon, open the installer and choose **检测环境** (Check Environment), then **仅更新 FPS 控制端** (Update FPS Only). This keeps your video service, passwords, and game mappings. Daemon 1.4.1 restarts a failed renderer while the cursor is requested and restores the latest position. Touch input remains available during recovery.
 
+## Playing on the iPad screen, audio, and edge control
+
+After saving your layout, wait for the FPS input connection, then select **直看 iPad（暂停投屏）**. The Mac stops requesting video frames. Your mappings, game cursor and F8 capture still work. Clear the checkbox to resume live video; opening the layout editor or calibration also resumes mirroring.
+
+To hear game audio on the Mac, connect and unlock the iPad over USB. In **Audio MIDI Setup → Window → Show Audio Devices**, enable the iPad. Turn on **iPad 游戏声音** in iControl, and grant audio input permission. The audio input follows the connected iPad when you connect or switch tablets. If macOS cannot identify the endpoint unambiguously, confirm it once; iControl remembers the choice for that iPad. Audio plays through the Mac’s default output independently of mirroring. It is not recorded, and there is no need to change the Mac’s default input. If iControl detects an input level but you hear nothing, check your Mac output device and volume.
+
+For ordinary touch control, enable **鼠标跨屏** and choose a side and a section of that edge. With the control window active, move to that outer edge of its display and pause briefly. Click or drag on the iPad; cross the same seam in reverse, press Esc, or right-click to return. A marker appears in the Mac preview and, if the iPad cursor service is configured and available, on the device itself. Hot corners and seams leading to another Mac display are excluded. FPS mode disables edge entry and uses F8 to capture or release input instead.
+
 ## Troubleshooting
 
 | Symptom | What to check |

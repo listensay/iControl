@@ -23,8 +23,8 @@ eff873a15d6b5a2afb287111f04a8a89532cb4bf7acbf63b5e3160c8a27753df  com.82flex.tro
 
 - Project: https://github.com/novnc/noVNC
 - License: MPL-2.0 for the JavaScript core; individual copyright notices are preserved in each file.
-- The pinned core and vendor snapshot is taken without modification from the TrollVNC release source commit above, at `layout/usr/share/trollvnc/webclients/novnc`.
-- The actual JavaScript source is distributed in the application resource bundle at `Resources/Viewer/novnc` and in this source tree. iControl's integration wrapper is separate at `Resources/Viewer/viewer.js`.
+- The pinned core and vendor snapshot is based on the TrollVNC release source commit above, at `layout/usr/share/trollvnc/webclients/novnc`.
+- iControl modifies `core/rfb.js` to pause and resume framebuffer updates without closing the connection. The actual JavaScript source is distributed in the application resource bundle at `Resources/Viewer/novnc` and in this source tree. iControl's integration wrapper is separate at `Resources/Viewer/viewer.js`.
 - The MPL-2.0 and BSD texts, noVNC authors list, and upstream license summary are in `Resources/Licenses/`.
 - The incorporated DES implementation's copyright/license notices are preserved in `core/crypto/des.js`.
 

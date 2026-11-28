@@ -27,6 +27,10 @@ struct ContentView: View {
         .frame(minWidth: 940, minHeight: 660)
         .background(Color(nsColor: .windowBackgroundColor))
         .tint(.blue)
+        .onChange(of: EdgePointerSession.current(for: model), initial: true) { _, _ in
+            model.edgePointer.synchronize(with: model)
+        }
+        .onDisappear { model.edgePointer.detach() }
         .sheet(isPresented: $model.showInstaller) {
             InstallerView(model: model, device: model.selectedDevice)
         }
@@ -45,7 +49,7 @@ struct ContentView: View {
         HStack(spacing: 9) {
             HStack(spacing: 7) {
                 Circle().fill(model.phase.color).frame(width: 7, height: 7)
-                Text(model.phase.title).font(.system(size: 12, weight: .medium))
+                Text(fps.directView ? "投屏已暂停" : model.phase.title).font(.system(size: 12, weight: .medium))
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
             .background(model.phase.color.opacity(0.09), in: Capsule())
@@ -98,6 +102,9 @@ struct ContentView: View {
                 Divider()
                 fpsControls
                 Divider()
+                EdgePointerControls(controller: model.edgePointer)
+                IPadAudioControls(controller: model.iPadAudio)
+                Divider()
                 VStack(alignment: .leading, spacing: 12) {
                     Toggle("断线自动重连", isOn: $model.autoReconnect).toggleStyle(.checkbox)
                 }.font(.system(size: 11))
@@ -144,6 +151,10 @@ struct ContentView: View {
                     }.help(fps.captured ? "释放输入 · F8" : "捕获鼠标 · F8")
                         .disabled(!fps.ready || fps.calibration != nil)
                 }.font(.system(size: 11))
+                Toggle("直看 iPad（暂停投屏）", isOn: Binding(get: { fps.directView }, set: { fps.setDirectView($0) }))
+                    .toggleStyle(.checkbox).font(.system(size: 11))
+                    .disabled(!fps.directView && !fps.canPauseMirroring)
+                    .help("停止传输游戏画面，继续用 Mac 键鼠操作；关闭即可恢复投屏。")
                 Toggle("显示触控位置", isOn: $fps.showMarkers).toggleStyle(.checkbox).font(.system(size: 11))
                 Button { fps.showGameCursor() } label: {
                     Label(fps.cursorMode ? "鼠标已呼出" : "呼出鼠标", systemImage: fps.cursorMode ? "cursorarrow.click" : "cursorarrow")
@@ -223,6 +234,19 @@ struct ContentView: View {
                 Color(red: 0.065, green: 0.09, blue: 0.13)
                 if let url = model.viewerURL {
                     ViewerView(model: model, fps: fps, url: url)
+                        .overlay {
+                            if fps.directView {
+                                ZStack {
+                                    Color(red: 0.065, green: 0.09, blue: 0.13)
+                                    VStack(spacing: 12) {
+                                        Image(systemName: "ipad.landscape").font(.system(size: 54, weight: .light))
+                                        Text("请看 iPad 屏幕").font(.title3.weight(.medium))
+                                        Text(fps.captured ? "Mac 键鼠已锁定 · F8 释放" : "点击此处或按 F8 捕获键鼠")
+                                            .font(.callout).foregroundStyle(.white.opacity(0.72))
+                                    }.foregroundStyle(.white)
+                                }.allowsHitTesting(false)
+                            }
+                        }
                 } else {
                     VStack(spacing: 18) {
                         Image(systemName: "ipad.landscape").font(.system(size: 72, weight: .ultraLight)).foregroundStyle(Color.white.opacity(0.28))

@@ -42,15 +42,17 @@ private struct DeviceScan: Sendable {
 
 @MainActor
 final class ControlModel: ObservableObject {
-    @Published var devices: [USBDevice] = []
-    @Published private(set) var selectedUDID = ""
+    let iPadAudio = IPadAudioController()
+    let edgePointer = EdgePointerController()
+    @Published var devices: [USBDevice] = [] { didSet { syncAudio() } }
+    @Published private(set) var selectedUDID = "" { didSet { syncAudio() } }
     @Published var hardwarePresent = false
     @Published var discoveryError: String?
     @Published var scanning = false
     @Published var phase: ControlPhase = .idle
     @Published var detail = "用 USB 数据线连接 iPad，然后点“连接 iPad”。"
-    @Published var wantsConnection = false
-    @Published var viewerConnected = false
+    @Published var wantsConnection = false { didSet { syncAudio() } }
+    @Published var viewerConnected = false { didSet { syncAudio() } }
     @Published var viewerURL: URL?
     @Published var connectionAttempt = 0
     @Published var vncPassword = ""
@@ -87,10 +89,23 @@ final class ControlModel: ObservableObject {
         isDemo = testSocket != nil
         mux = USBMux(socketPath: testSocket ?? "/var/run/usbmuxd")
         let initialUDID = UserDefaults.standard.string(forKey: "lastDevice") ?? ""
-        selectedUDID = initialUDID
         fpsController = FPSController(mux: mux, isDemo: isDemo, selectedDevice: initialUDID)
+        selectedUDID = initialUDID
+        fpsController.beforeGameMode = { [weak edgePointer] in edgePointer?.release() }
         viewerDriver.fpsController = fpsController
         fpsController.log = { [weak self] message in self?.log(message) }
+    }
+
+    private func syncAudio() {
+        // A selection (or a new usbmux attachment with the same UDID) isn't an
+        // authenticated connection yet. Pausing video does not change this identity.
+        let target = selectedDevice.flatMap { device -> USBDevice? in
+            guard wantsConnection, viewerConnected, !isDemo, !fpsUpdaterOnly,
+                  let connected = forwarder?.device, connected.udid == device.udid,
+                  connected.deviceID == device.deviceID else { return nil }
+            return device
+        }
+        iPadAudio.update(device: target, attached: devices)
     }
 
     var selectedDevice: USBDevice? { devices.first { $0.udid == selectedUDID } }
@@ -297,6 +312,7 @@ final class ControlModel: ObservableObject {
     }
 
     private func tearDownTransport() {
+        edgePointer.detach()
         showPasswordPrompt = false; authenticationWaiting = false
         fpsController.update(device: selectedDevice, videoReady: false)
         viewerDriver.disconnect()
@@ -366,6 +382,7 @@ final class ControlModel: ObservableObject {
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString(diagnostics(), forType: .string)
     }
     func shutdown() {
+        iPadAudio.shutdown(); edgePointer.detach()
         monitor?.cancel(); attemptTask?.cancel(); fpsController.shutdown(); wantsConnection = false; tearDownTransport()
     }
 }

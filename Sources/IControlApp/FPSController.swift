@@ -5,7 +5,18 @@ import IControlCore
 
 @MainActor
 final class FPSController: ObservableObject {
-    @Published var enabled = false { didSet { if !enabled { calibration = nil; cancelLayoutEditing(); stopLink() }; synchronize() } }
+    @Published var enabled = false {
+        willSet { if newValue && !enabled { beforeGameMode?() } }
+        didSet { if !enabled { calibration = nil; cancelLayoutEditing(); stopLink() }; synchronize() }
+    }
+    var beforeGameMode: (() -> Void)?
+    @Published private(set) var directView = false
+    var canPauseMirroring: Bool { enabled && ready && videoReady && !isEditingLayout && calibration == nil }
+    func setDirectView(_ on: Bool) {
+        guard directView != on, !on || canPauseMirroring else { return }
+        directView = on
+        visualsChanged?()
+    }
     @Published private(set) var ready = false
     @Published private(set) var connecting = false
     @Published private(set) var captured = false
@@ -42,6 +53,10 @@ final class FPSController: ObservableObject {
     private var device: USBDevice?
     private var accessToken = ""
     private var sessionTokens: [String: String] = [:]
+    // Ordinary cross-screen clicks use VNC. When this iPad also has the cursor
+    // service installed, borrow the same authenticated link for a visible dot.
+    private var edgeCursorPoint: FPSPoint?
+    private var needsInputLink: Bool { enabled || edgeCursorPoint != nil }
     private var link: FPSUSBLink?
     // Only AppKit/SwiftUI feedback is resolved here. The link owns gameplay state.
     private var keyFeedback: [String: (action: String?, togglesCursor: Bool)] = [:]
@@ -148,7 +163,7 @@ final class FPSController: ObservableObject {
 
     func synchronize() {
         visualsChanged?()
-        guard enabled else {
+        guard needsInputLink else {
             if status != "进入游戏后开启 FPS 模式。" { status = "进入游戏后开启 FPS 模式。" }
             return
         }
@@ -175,7 +190,7 @@ final class FPSController: ObservableObject {
                     try FPSUSBLink.connect(mux: mux, device: device, token: token, callback: notify)
                 }
             }.value
-            guard epoch == currentEpoch, enabled, videoReady else {
+            guard epoch == currentEpoch, needsInputLink, videoReady else {
                 if case .success(let abandoned) = result { abandoned.stop() }; return
             }
             connecting = false
@@ -183,6 +198,7 @@ final class FPSController: ObservableObject {
             case .success(let link):
                 self.link = link; supportsDeviceCursor = link.supportsDeviceCursor; ready = true
                 status = isEditingLayout ? "拖动按键移动位置，拖动角点调整大小。" : "点击画面或按 F8 捕获鼠标；F8 释放。"
+                if let edgeCursorPoint { link.setDeviceCursor(.init(point: edgeCursorPoint)) }
                 log?("FPS USB 多点触摸通道已连接。")
             case .failure(let error): status = error.localizedDescription
             }
@@ -193,9 +209,13 @@ final class FPSController: ObservableObject {
         guard self.epoch == epoch else { return }
         switch event {
         case .acknowledgement(let milliseconds, let contacts, let orientation):
+            if directView, profile.orientation == .automatic, hasRemoteOrientation, remoteOrientation != orientation {
+                setDirectView(false); releaseCapture()
+                status = "iPad 方向已变化，已恢复投屏。确认布局后可重新捕获。"
+            }
             if remoteOrientation != orientation { remoteOrientation = orientation }
             if !hasRemoteOrientation { hasRemoteOrientation = true }
-            guard !showSettings, !isEditingLayout else { return }
+            guard enabled, !showSettings, !isEditingLayout else { return }
             roundTripMilliseconds = milliseconds
             if remoteContacts != contacts { remoteContacts = contacts }
         case .failed(let message):
@@ -205,6 +225,22 @@ final class FPSController: ObservableObject {
             if deviceCursorVisible != visible { deviceCursorVisible = visible }
             if cursorMode { updateCursorStatus() }
         }
+    }
+
+    func beginEdgeCursor(at point: FPSPoint) {
+        guard !enabled, videoReady, point.isValid else { return }
+        edgeCursorPoint = point
+        synchronize()
+    }
+    func moveEdgeCursor(to point: FPSPoint) {
+        guard !enabled, edgeCursorPoint != nil, point.isValid, point != edgeCursorPoint else { return }
+        edgeCursorPoint = point
+        link?.setDeviceCursor(.init(point: point))
+    }
+    func endEdgeCursor() {
+        guard edgeCursorPoint != nil else { return }
+        edgeCursorPoint = nil
+        if !enabled { stopLink() }
     }
 
     func toggleCapture() { captured ? releaseCapture() : capture() }
@@ -318,7 +354,7 @@ final class FPSController: ObservableObject {
 
     func beginCalibration(_ target: String) {
         guard videoReady, !isEditingLayout else { return }
-        releaseCapture(); enabled = true; calibration = target; showSettings = false
+        setDirectView(false); releaseCapture(); enabled = true; calibration = target; showSettings = false
         status = "在游戏画面中点击\(calibrationTitle)进行标定。"; visualsChanged?()
     }
     func cancelCalibration() { calibration = nil; visualsChanged?(); synchronize() }
@@ -349,7 +385,7 @@ final class FPSController: ObservableObject {
     }
     func beginLayoutEditing(_ target: String = "joystick") {
         guard videoReady else { return }
-        releaseCapture(); calibration = nil; enabled = true; showSettings = false
+        setDirectView(false); releaseCapture(); calibration = nil; enabled = true; showSettings = false
         if layoutEditor == nil {
             layoutSession = UUID().uuidString; layoutSequence = 0
             layoutDeviceUDID = device?.udid
@@ -585,6 +621,8 @@ final class FPSController: ObservableObject {
         do { try library.save(to: libraryURL) } catch { status = "FPS 配置保存失败：\(error.localizedDescription)" }
     }
     private func stopLink() {
+        edgeCursorPoint = nil
+        setDirectView(false)
         stopLayoutTest()
         releaseCapture(); link?.stop(); link = nil; ready = false; connecting = false
         deviceCursorAvailable = false; deviceCursorVisible = false; supportsDeviceCursor = false

@@ -8,7 +8,7 @@ A native macOS app with an integrated iPad display, editable touch mappings, and
 
 [Download for Mac](https://github.com/listensay/icontrol/releases) · [Prerequisites & setup guide](docs/SETUP.md) · [中文准备与使用教程](docs/SETUP.zh-CN.md)
 
-Mac **1.4.11 (19)** · Apple Silicon · macOS 14+ · iPad FPS daemon **1.4.1**
+Mac **1.4.12 (20)** · Apple Silicon · macOS 14+ · iPad FPS daemon **1.4.1**
 
 ## In the game
 
@@ -19,6 +19,7 @@ The layout editor on a real game screen. This screenshot was supplied by the use
 ## Features
 
 - **One window for display and control.** USB device selection, embedded video, connection status, full screen, and an optional macOS Screen Sharing client.
+- **Play on the iPad screen.** Pause mirroring without stopping game input, listen to USB game audio on the Mac, and use configurable screen edges to enter and leave ordinary iPad pointer control. Edge entry is disabled in FPS mode. See the [setup guide](docs/SETUP.md).
 - **Simultaneous game input.** WASD movement, relative mouse look, and separate touch contacts for firing, aiming, and other actions.
 - **Visual layout editing.** Drag the joystick center, look region, buttons, and swipe endpoints directly over the game. Resize with corner handles; undo, redo, and save a layout draft.
 - **Complete mapping management.** Add, search, rename, rebind, enable, disable, or delete presets and up to 32 custom buttons per profile. Hold, tap, and swipe are supported; deleted presets can be restored.
